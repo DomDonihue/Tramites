@@ -1,0 +1,47 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './lib/auth'
+import { AppLayout } from './components/layout/AppLayout'
+import { LoginPage } from './pages/LoginPage'
+import { BuscarPage } from './pages/BuscarPage'
+import { ExpedienteFormPage } from './pages/ExpedienteFormPage'
+import { EstadisticasPage } from './pages/EstadisticasPage'
+import { RepositorioPage } from './pages/RepositorioPage'
+import { UsuariosPage } from './pages/UsuariosPage'
+
+function ProtectedRoutes() {
+  const { user, can } = useAuth()
+  if (!user) return <Navigate to="/" replace />
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/buscar" element={<BuscarPage />} />
+        <Route path="/nuevo" element={<ExpedienteFormPage />} />
+        <Route path="/expediente/:id" element={<ExpedienteFormPage />} />
+        <Route path="/estadisticas" element={<EstadisticasPage />} />
+        <Route path="/repositorio" element={<RepositorioPage />} />
+        {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
+        <Route path="*" element={<Navigate to="/buscar" replace />} />
+      </Routes>
+    </AppLayout>
+  )
+}
+
+function AuthGate() {
+  const { user } = useAuth()
+  return (
+    <Routes>
+      <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
+      <Route path="/*" element={<ProtectedRoutes />} />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AuthGate />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
