@@ -25,11 +25,13 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'pe_espec',    label: 'Especificaciones Técnicas',  tipo_doc: 'OTRO',         requerido: false },
     { id: 'pe_ubic',     label: 'Plano de Ubicación',         tipo_doc: 'PLANO',        requerido: true  },
     { id: 'pe_resol',    label: 'Resolución',                 tipo_doc: 'RESOLUCION',   requerido: false },
+    { id: 'pe_patente',  label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
   'PERMISOS_EDIFICACION_MODIFICACION': [
     { id: 'mod_resol',   label: 'Resolución de Modificación', tipo_doc: 'RESOLUCION',   requerido: true  },
     { id: 'mod_plano',   label: 'Planos Modificados',         tipo_doc: 'PLANO',        requerido: true  },
     { id: 'mod_eet',     label: 'Memoria EET Actualizada',    tipo_doc: 'MEMORIA_EET',  requerido: false },
+    { id: 'mod_patente', label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
   'PERMISOS_EDIFICACION_RECEPCION': [
     { id: 'rec_cert',    label: 'Certificado de Recepción Final', tipo_doc: 'RECEPCION',  requerido: true  },
@@ -43,6 +45,7 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'om_permiso',  label: 'Permiso Obra Menor',         tipo_doc: 'PERMISO',      requerido: true  },
     { id: 'om_croquis',  label: 'Croquis / Plano',            tipo_doc: 'PLANO',        requerido: true  },
     { id: 'om_resol',    label: 'Resolución',                 tipo_doc: 'RESOLUCION',   requerido: false },
+    { id: 'om_patente',  label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
   'OBRAS_MENORES_MODIFICACION': [
     { id: 'om_mod_resol',label: 'Resolución de Modificación', tipo_doc: 'RESOLUCION',   requerido: true  },
@@ -63,6 +66,7 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'sub_plano',   label: 'Plano de Subdivisión',       tipo_doc: 'PLANO',        requerido: true  },
     { id: 'sub_resol',   label: 'Resolución',                 tipo_doc: 'RESOLUCION',   requerido: true  },
     { id: 'sub_croquis', label: 'Croquis de Deslindes',       tipo_doc: 'PLANO',        requerido: false },
+    { id: 'sub_patente', label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
   'SUBDIVISION_URB_MODIFICACION': [
     { id: 'sub_mod',     label: 'Resolución de Modificación', tipo_doc: 'RESOLUCION',   requerido: true  },
@@ -79,6 +83,7 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'cat_plano',   label: 'Plano de Arquitectura',      tipo_doc: 'PLANO',        requerido: true  },
     { id: 'cat_resol',   label: 'Resolución',                 tipo_doc: 'RESOLUCION',   requerido: true  },
     { id: 'cat_eet',     label: 'Memoria EET',                tipo_doc: 'MEMORIA_EET',  requerido: false },
+    { id: 'cat_patente', label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
   'ZONAS_CATASTROFE_RECEPCION': [
     { id: 'cat_rec',     label: 'Certificado de Recepción',   tipo_doc: 'RECEPCION',    requerido: true  },
@@ -110,6 +115,7 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'req_resol',   label: 'Resolución',                 tipo_doc: 'RESOLUCION',   requerido: false },
     { id: 'req_eet',     label: 'Memoria EET',                tipo_doc: 'MEMORIA_EET',  requerido: false },
     { id: 'req_foto',    label: 'Fotografías del Inmueble',   tipo_doc: 'OTRO',         requerido: false },
+    { id: 'req_patente', label: 'Patente Profesional',        tipo_doc: 'OTRO',         requerido: true  },
   ],
 
   // ── CERTIFICADOS ─────────────────────────────────────────────────────────
