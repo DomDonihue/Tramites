@@ -4,6 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DOM en Línea — Doñihue</title>
+  <script>
+    // Restore path redirected by 404.html for GitHub Pages SPA
+    (function() {
+      var redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect !== location.href) {
+        history.replaceState(null, null, redirect);
+      }
+      var q = window.location.search.slice(1);
+      if (q.indexOf('p=/') === 0) {
+        var parts = q.slice(3).split('&q=');
+        var path = parts[0].replace(/~and~/g, '&');
+        var search = parts[1] ? '?' + parts[1].replace(/~and~/g, '&') : '';
+        history.replaceState(null, null, '/Tramites/' + path + search + location.hash);
+      }
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23185FA5'/><text x='16' y='22' text-anchor='middle' fill='white' font-size='14' font-weight='bold' font-family='sans-serif'>DOM</text></svg>" />
 </head>
 <body>
