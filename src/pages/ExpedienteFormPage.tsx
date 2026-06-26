@@ -171,7 +171,7 @@ export function ExpedienteFormPage() {
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 focus:border-dom-navy"
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ConfirmDialog
         open={!!deleteDocTarget}

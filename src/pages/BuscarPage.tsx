@@ -74,7 +74,7 @@ export function BuscarPage() {
   const fmtM2 = (n?: number) => n && n > 0 ? `${n.toLocaleString('es-CL')} m²` : '—'
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-full mx-auto">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ConfirmDialog
         open={!!deleteTarget}
@@ -184,11 +184,12 @@ export function BuscarPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr>
-                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN',''].map(col => (
+                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN'].map(col => (
                       <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
                         {col}
                       </th>
                     ))}
+                    <th className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 sticky right-0 z-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -207,7 +208,7 @@ export function BuscarPage() {
                       <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right">{exp.caja ?? '—'}</td>
                       <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right font-medium">{fmt(exp.total_pesos)}</td>
                       <td className="px-2 py-1.5 border border-gray-200 max-w-[140px] truncate">{exp.direccion}</td>
-                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">
                         <div className="flex gap-1">
                           <button
                             onClick={() => navigate(`/expediente/${exp.id}`)}
