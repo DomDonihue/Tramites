@@ -131,7 +131,6 @@ export function ExpedienteFormPage() {
               nombre:        archivo.file.name,
               tipo_doc:      archivo.tipo_doc as any,
               url,
-              subido_por:    user?.id || '',
             })
             setDocs(prev => [...prev, doc])
             setCola(prev => prev.map((a, idx) => idx === i ? { ...a, estado: 'ok', url } : a))
