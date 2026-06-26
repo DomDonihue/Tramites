@@ -39,7 +39,7 @@ function AuthGate() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter basename="/Tramites">
         <AuthGate />
       </BrowserRouter>
     </AuthProvider>
