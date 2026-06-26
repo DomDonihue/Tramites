@@ -180,93 +180,55 @@ export function BuscarPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {results.map(exp => (
-                <div key={exp.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  {/* Card header */}
-                  <div className="px-5 py-4 border-b border-gray-50 flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <CategoriaBadge cat={exp.categoria} />
-                      <span className="text-xs text-gray-400">{exp.tipo_tramite.replace(/_/g, ' ')}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <EstadoBadge estado={exp.estado} />
-                      <span className="text-xs font-mono text-gray-400">{exp.numero}</span>
-                    </div>
-                  </div>
-
-                  {/* Card body */}
-                  <div className="px-5 py-4">
-                    <h3 className="font-semibold text-gray-900 mb-3">{exp.propietario}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm mb-4">
-                      <div><span className="text-xs text-gray-400 block">Rol de avalúo</span><span className="font-mono text-gray-800">{exp.rol_avaluo}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Dirección</span><span className="text-gray-800">{exp.direccion}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Profesional</span><span className="text-gray-800">{exp.profesional}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Etapa</span><span className="text-gray-800">{ETAPA_LABELS[exp.etapa]}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Superficie</span><span className="text-gray-800">{fmtM2(exp.superficie_m2)}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Total</span><span className="text-gray-800 font-medium">{fmt(exp.total_pesos)}</span></div>
-                    </div>
-
-                    {/* Documents */}
-                    {(exp.documentos?.length ?? 0) > 0 && (
-                      <div className="mb-4">
-                        <button
-                          onClick={() => toggleDocs(exp.id)}
-                          className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 mb-2"
-                        >
-                          <FileText size={13} />
-                          {exp.documentos!.length} documento{exp.documentos!.length !== 1 ? 's' : ''} adjunto{exp.documentos!.length !== 1 ? 's' : ''}
-                          {expandedDocs.has(exp.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                        </button>
-                        {expandedDocs.has(exp.id) && (
-                          <div className="flex flex-wrap gap-2">
-                            {exp.documentos!.map(doc => (
-                              <button
-                                key={doc.id}
-                                onClick={() => window.open('#', '_blank')}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-xs text-dom-navy hover:bg-dom-navy hover:text-white transition-colors group"
-                              >
-                                <FileText size={12} />
-                                {doc.nombre}
-                                <ExternalLink size={11} className="opacity-50 group-hover:opacity-100" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Ruta repositorio */}
-                    <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2 flex-wrap">
-                      <FolderOpen size={13} className="text-amber-500 shrink-0" />
-                      {generarRutaRepositorio(exp).split('/').map((seg, i, arr) => (
-                        <span key={i} className="flex items-center gap-1 text-xs font-mono">
-                          {i > 0 && <ChevronRight size={10} className="text-amber-300" />}
-                          <span className={i === arr.length - 1 ? 'text-amber-800 font-semibold' : 'text-amber-600'}>{seg}</span>
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-3 border-t border-gray-50">
-                      <button
-                        onClick={() => navigate(`/expediente/${exp.id}`)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
-                      >
-                        <Edit2 size={13} /> Ver / Editar
-                      </button>
-                      {can('delete') && (
-                        <button
-                          onClick={() => setDeleteTarget(exp)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-100 rounded-lg hover:bg-red-50 text-red-600"
-                        >
-                          <Trash2 size={13} /> Eliminar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN',''].map(col => (
+                      <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((exp, i) => (
+                    <tr key={exp.id} className={i % 2 === 0 ? 'bg-white hover:bg-yellow-50' : 'bg-gray-50 hover:bg-yellow-50'}>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">{exp.fecha ?? exp.ano}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap font-mono">{exp.numero}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 font-medium max-w-[160px] truncate">{exp.propietario}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
+                        <CategoriaBadge cat={exp.categoria} />
+                      </td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">{exp.tipo_tramite.replace(/_/g, ' ')}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap font-mono">{exp.rol_avaluo}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 max-w-[120px] truncate">{exp.profesional}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right">{fmtM2(exp.superficie_m2)}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right">{exp.caja ?? '—'}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right font-medium">{fmt(exp.total_pesos)}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 max-w-[140px] truncate">{exp.direccion}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => navigate(`/expediente/${exp.id}`)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-200 rounded hover:bg-gray-100 text-gray-600"
+                          >
+                            <Edit2 size={11} /> Editar
+                          </button>
+                          {can('delete') && (
+                            <button
+                              onClick={() => setDeleteTarget(exp)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs border border-red-100 rounded hover:bg-red-50 text-red-600"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
