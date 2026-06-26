@@ -1,4 +1,4 @@
-import { Expediente, Usuario, Documento } from '../types'
+import { Expediente, Usuario, Documento, Desarchivo } from '../types'
 
 export const mockUsuarios: Usuario[] = [
   { id: 'u0', nombre: 'Eugenio Novo Calderon', email: 'enovo@mdonihue.cl', perfil: 'admin', activo: true, created_at: '2024-01-01T10:00:00Z' },
@@ -205,6 +205,7 @@ export const mockExpedientes: Expediente[] = [
 // In-memory store
 let expedientesStore = [...mockExpedientes]
 let usuariosStore = [...mockUsuarios]
+let desarchivosStore: Desarchivo[] = []
 
 export const db = {
   // Expedientes
@@ -259,5 +260,13 @@ export const db = {
   },
   deleteUsuario: (id: string) => {
     usuariosStore = usuariosStore.filter(u => u.id !== id)
+  },
+  // Desarchivos
+  getDesarchivos: (expedienteId?: string) =>
+    expedienteId ? desarchivosStore.filter(d => d.expediente_id === expedienteId) : [...desarchivosStore],
+  createDesarchivo: (data: Omit<Desarchivo, 'id' | 'created_at'>) => {
+    const nuevo: Desarchivo = { ...data, id: 'da' + Date.now(), created_at: new Date().toISOString() }
+    desarchivosStore = [nuevo, ...desarchivosStore]
+    return nuevo
   },
 }

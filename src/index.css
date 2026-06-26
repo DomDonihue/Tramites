@@ -10,6 +10,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Print styles for desarchivo */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body { background: white; }
+  aside, nav, header { display: none !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+  #desarchivo-print { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+}
+@media screen {
+  .print-only { display: none !important; }
+}
+
 @keyframes slide-in-from-right {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }

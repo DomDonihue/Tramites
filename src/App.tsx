@@ -7,6 +7,7 @@ import { ExpedienteFormPage } from './pages/ExpedienteFormPage'
 import { EstadisticasPage } from './pages/EstadisticasPage'
 import { RepositorioPage } from './pages/RepositorioPage'
 import { UsuariosPage } from './pages/UsuariosPage'
+import { DesarchivePage } from './pages/DesarchivePage'
 
 function ProtectedRoutes() {
   const { user, can } = useAuth()
@@ -19,6 +20,7 @@ function ProtectedRoutes() {
         <Route path="/expediente/:id" element={<ExpedienteFormPage />} />
         <Route path="/estadisticas" element={<EstadisticasPage />} />
         <Route path="/repositorio" element={<RepositorioPage />} />
+        <Route path="/desarchivo/:id" element={<DesarchivePage />} />
         {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
         <Route path="*" element={<Navigate to="/buscar" replace />} />
       </Routes>

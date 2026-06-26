@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ExternalLink, ChevronDown, ChevronUp, X, FolderOpen, ChevronRight } from 'lucide-react'
+import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ChevronDown, ChevronUp, X, ChevronRight, Archive } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import { Expediente, Categoria, Estado, Etapa, CATEGORIA_LABELS, ESTADO_CONFIG, ETAPA_LABELS } from '../types'
@@ -215,6 +215,13 @@ export function BuscarPage() {
                             className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-200 rounded hover:bg-gray-100 text-gray-600"
                           >
                             <Edit2 size={11} /> Editar
+                          </button>
+                          <button
+                            onClick={() => navigate(`/desarchivo/${exp.id}`)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs border border-amber-200 rounded hover:bg-amber-50 text-amber-700"
+                            title="Desarchivo"
+                          >
+                            <Archive size={11} /> Desarchivo
                           </button>
                           {can('delete') && (
                             <button

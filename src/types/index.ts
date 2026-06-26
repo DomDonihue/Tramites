@@ -57,6 +57,26 @@ export interface Expediente {
   documentos?: Documento[]
 }
 
+export type DocDesarchivo = 'plano' | 'permiso_edificacion' | 'recepcion' | 'eet'
+
+export interface Desarchivo {
+  id: string
+  expediente_id: string
+  solicitante: string
+  rut_solicitante?: string
+  documentos: DocDesarchivo[]
+  fecha: string
+  funcionario?: string
+  created_at: string
+}
+
+export const DOC_DESARCHIVO_LABELS: Record<DocDesarchivo, string> = {
+  plano: 'Plano',
+  permiso_edificacion: 'Permiso de Edificación',
+  recepcion: 'Recepción',
+  eet: 'EET (Especificaciones Técnicas)',
+}
+
 export interface AuthUser {
   id: string
   email: string
