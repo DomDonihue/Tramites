@@ -8,6 +8,7 @@ export type Categoria =
   | 'TORRES_ANTENAS'
   | 'AUTORIZACION_APRO'
   | 'REGULARIZACION'
+  | 'DECLARACION_JURADA'
 export type Etapa = 'ANTEPROYECTO' | 'PERMISO' | 'MODIFICACION' | 'RECEPCION'
 export type Estado = 'en_revision' | 'aprobado' | 'observado' | 'vigente' | 'rechazado'
 export type TipoDoc = 'PERMISO' | 'ANTEPROYECTO' | 'PLANO' | 'CERTIFICADO' | 'RECEPCION' | 'MODIFICACION' | 'OTRO'
@@ -39,6 +40,7 @@ export interface Expediente {
   rol_avaluo: string
   direccion: string
   profesional: string
+  patente_profesional?: string
   categoria: Categoria
   tipo_tramite: string
   etapa: Etapa
@@ -71,6 +73,7 @@ export const TIPOS_POR_CATEGORIA: Record<Categoria, string[]> = {
   TORRES_ANTENAS: ['116_BIS_F_GENERAL', '116_BIS_F_ESPECIAL', '116_BIS_G_SIMPLIF'],
   AUTORIZACION_APRO: ['OBRA_PRELIMINAR', 'DEMOLICION', 'CAMBIO_DESTINO', 'MOD_DESLINDES', 'REC_DESLINDES'],
   REGULARIZACION: ['LEY_20898', 'LEY_21031', 'LEY_21052', 'LEY_20251'],
+  DECLARACION_JURADA: ['DJ_OBRA_MENOR', 'DJ_REGULARIZACION', 'DJ_OTRO'],
 }
 
 export const CATEGORIA_LABELS: Record<Categoria, string> = {
@@ -82,6 +85,7 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   TORRES_ANTENAS: 'Torres y Antenas',
   AUTORIZACION_APRO: 'Autorización APRO',
   REGULARIZACION: 'Regularización',
+  DECLARACION_JURADA: 'Declaración Jurada',
 }
 
 export const ESTADO_CONFIG: Record<Estado, { label: string; color: string; bg: string }> = {

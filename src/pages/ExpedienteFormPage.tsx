@@ -20,22 +20,23 @@ interface ArchivoEnCola {
 }
 
 const EMPTY: Omit<Expediente, 'id' | 'created_at' | 'updated_at' | 'documentos'> = {
-  ano:          new Date().getFullYear(),
-  numero:       '',
-  propietario:  '',
-  rol_avaluo:   '',
-  direccion:    '',
-  profesional:  '',
-  categoria:    'PERMISOS_EDIFICACION',
-  tipo_tramite: 'OBRA_NUEVA',
-  etapa:        'PERMISO',
-  estado:       'en_revision',
-  superficie_m2: undefined,
-  total_pesos:   undefined,
-  caja:          undefined,
-  num_permiso:   '',
-  observaciones: '',
-  fuente:        'manual',
+  ano:                 new Date().getFullYear(),
+  numero:              '',
+  propietario:         '',
+  rol_avaluo:          '',
+  direccion:           '',
+  profesional:         '',
+  patente_profesional: '',
+  categoria:           'PERMISOS_EDIFICACION',
+  tipo_tramite:        'OBRA_NUEVA',
+  etapa:               'PERMISO',
+  estado:              'en_revision',
+  superficie_m2:       undefined,
+  total_pesos:         undefined,
+  caja:                undefined,
+  num_permiso:         '',
+  observaciones:       '',
+  fuente:              'manual',
 }
 
 export function ExpedienteFormPage() {
@@ -158,6 +159,7 @@ export function ExpedienteFormPage() {
   }
 
   const tipos = TIPOS_POR_CATEGORIA[form.categoria as Categoria] || []
+  const esDJ = form.categoria === 'DECLARACION_JURADA'
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div>
@@ -239,9 +241,11 @@ export function ExpedienteFormPage() {
 
         {/* ── Propietario ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">Propietario y ubicación</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">
+            {esDJ ? 'Datos del declarante' : 'Propietario y ubicación'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Propietario *">
+            <Field label={esDJ ? 'Declarante *' : 'Propietario *'}>
               <input className={inputCls} value={form.propietario} onChange={e => set('propietario', e.target.value)} placeholder="Nombre completo" required />
             </Field>
             <Field label="Rol de avalúo *">
@@ -252,34 +256,51 @@ export function ExpedienteFormPage() {
                 <input className={inputCls} value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Calle y número" />
               </Field>
             </div>
-            <div className="md:col-span-2">
-              <Field label="Profesional responsable">
-                <input className={inputCls} value={form.profesional} onChange={e => set('profesional', e.target.value)} placeholder="Nombre del arquitecto o ingeniero" />
-              </Field>
-            </div>
+            {!esDJ && (
+              <>
+                <Field label="Profesional responsable">
+                  <input className={inputCls} value={form.profesional} onChange={e => set('profesional', e.target.value)} placeholder="Nombre del arquitecto o ingeniero" />
+                </Field>
+                <Field label="Patente profesional">
+                  <input className={inputCls} value={form.patente_profesional || ''} onChange={e => set('patente_profesional', e.target.value)} placeholder="Ej: 12.345" />
+                </Field>
+              </>
+            )}
           </div>
         </div>
 
-        {/* ── Valores ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">Valores y medidas</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Field label="Superficie (m²)">
-              <input className={inputCls} type="number" step="0.01" value={form.superficie_m2 || ''} onChange={e => set('superficie_m2', e.target.value ? +e.target.value : undefined)} placeholder="0.00" />
-            </Field>
-            <Field label="Total ($)">
-              <input className={inputCls} type="number" value={form.total_pesos || ''} onChange={e => set('total_pesos', e.target.value ? +e.target.value : undefined)} placeholder="0" />
-            </Field>
-            <Field label="Caja">
-              <input className={inputCls} type="number" value={form.caja || ''} onChange={e => set('caja', e.target.value ? +e.target.value : undefined)} placeholder="1" />
+        {/* ── Valores (solo para trámites no-DJ) ── */}
+        {!esDJ && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">Valores y medidas</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Superficie (m²)">
+                <input className={inputCls} type="number" step="0.01" value={form.superficie_m2 || ''} onChange={e => set('superficie_m2', e.target.value ? +e.target.value : undefined)} placeholder="0.00" />
+              </Field>
+              <Field label="Total ($)">
+                <input className={inputCls} type="number" value={form.total_pesos || ''} onChange={e => set('total_pesos', e.target.value ? +e.target.value : undefined)} placeholder="0" />
+              </Field>
+              <Field label="Caja">
+                <input className={inputCls} type="number" value={form.caja || ''} onChange={e => set('caja', e.target.value ? +e.target.value : undefined)} placeholder="1" />
+              </Field>
+            </div>
+            <div className="mt-4">
+              <Field label="Observaciones">
+                <textarea className={`${inputCls} resize-none`} rows={3} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} placeholder="Notas adicionales…" />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {/* ── Observaciones para DJ ── */}
+        {esDJ && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">Contenido de la declaración</h2>
+            <Field label="Descripción / Motivo de la declaración">
+              <textarea className={`${inputCls} resize-none`} rows={4} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} placeholder="Describa el objeto de la declaración jurada…" />
             </Field>
           </div>
-          <div className="mt-4">
-            <Field label="Observaciones">
-              <textarea className={`${inputCls} resize-none`} rows={3} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} placeholder="Notas adicionales…" />
-            </Field>
-          </div>
-        </div>
+        )}
 
         {/* ── Checklist de documentos ── */}
         {(() => {

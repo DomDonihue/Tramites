@@ -117,6 +117,26 @@ const CHECKLIST: Record<ClaveChecklist, ItemChecklist[]> = {
     { id: 'cer_doc',     label: 'Certificado Emitido',        tipo_doc: 'CERTIFICADO',  requerido: true  },
     { id: 'cer_sol',     label: 'Solicitud del Interesado',   tipo_doc: 'OTRO',         requerido: false },
   ],
+
+  // ── DECLARACIÓN JURADA ───────────────────────────────────────────────────
+  'DECLARACION_JURADA_PERMISO': [
+    { id: 'dj_decl',     label: 'Declaración Jurada (firmada)', tipo_doc: 'OTRO',       requerido: true  },
+    { id: 'dj_cedula',   label: 'Cédula de Identidad',          tipo_doc: 'OTRO',       requerido: true  },
+    { id: 'dj_dominio',  label: 'Certificado de Dominio Vigente', tipo_doc: 'CERTIFICADO', requerido: false },
+  ],
+  'DECLARACION_JURADA_ANTEPROYECTO': [
+    { id: 'dj_decl_ap',  label: 'Declaración Jurada (firmada)', tipo_doc: 'OTRO',       requerido: true  },
+    { id: 'dj_cid_ap',   label: 'Cédula de Identidad',          tipo_doc: 'OTRO',       requerido: true  },
+  ],
+  'DECLARACION_JURADA_MODIFICACION': [
+    { id: 'dj_decl_mod', label: 'Declaración Jurada Modificada', tipo_doc: 'OTRO',      requerido: true  },
+    { id: 'dj_cid_mod',  label: 'Cédula de Identidad',           tipo_doc: 'OTRO',      requerido: true  },
+  ],
+  'DECLARACION_JURADA_RECEPCION': [
+    { id: 'dj_decl_rec', label: 'Declaración Jurada Final',    tipo_doc: 'OTRO',        requerido: true  },
+    { id: 'dj_cid_rec',  label: 'Cédula de Identidad',         tipo_doc: 'OTRO',        requerido: true  },
+    { id: 'dj_cert_rec', label: 'Certificado de Recepción',    tipo_doc: 'RECEPCION',   requerido: false },
+  ],
 }
 
 export function getChecklist(categoria: string, etapa: string): ItemChecklist[] {
