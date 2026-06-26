@@ -55,6 +55,7 @@ export interface Expediente {
   created_at: string
   updated_at: string
   documentos?: Documento[]
+  docs_en_archivo?: DocDesarchivo[]
 }
 
 export type DocDesarchivo = 'plano' | 'permiso_edificacion' | 'recepcion' | 'eet'

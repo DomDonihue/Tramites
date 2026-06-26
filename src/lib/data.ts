@@ -261,6 +261,12 @@ export const db = {
   deleteUsuario: (id: string) => {
     usuariosStore = usuariosStore.filter(u => u.id !== id)
   },
+  // Inventario de archivo por expediente
+  setDocsEnArchivo: (expedienteId: string, docs: import('../types').DocDesarchivo[]) => {
+    expedientesStore = expedientesStore.map(e =>
+      e.id === expedienteId ? { ...e, docs_en_archivo: docs, updated_at: new Date().toISOString() } : e
+    )
+  },
   // Desarchivos
   getDesarchivos: (expedienteId?: string) =>
     expedienteId ? desarchivosStore.filter(d => d.expediente_id === expedienteId) : [...desarchivosStore],
