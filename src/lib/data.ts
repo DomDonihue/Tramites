@@ -1,4 +1,4 @@
-import { Expediente, Usuario, Documento, Desarchivo } from '../types'
+import { Expediente, Usuario, Documento, Desarchivo, Certificado } from '../types'
 
 export const mockUsuarios: Usuario[] = [
   { id: 'u0', nombre: 'Eugenio Novo Calderon', email: 'enovo@mdonihue.cl', perfil: 'admin', activo: true, created_at: '2024-01-01T10:00:00Z' },
@@ -223,7 +223,8 @@ function lsSave(key: string, data: unknown) {
 // Stores con persistencia
 let expedientesStore: Expediente[] = lsLoad(LS_KEYS.expedientes, mockExpedientes)
 let usuariosStore:    Usuario[]    = lsLoad(LS_KEYS.usuarios,    mockUsuarios)
-let desarchivosStore: Desarchivo[] = lsLoad(LS_KEYS.desarchivos, [])
+let desarchivosStore: Desarchivo[]  = lsLoad(LS_KEYS.desarchivos, [])
+let certificadosStore: Certificado[] = lsLoad('dom_certificados', [])
 
 export const db = {
   // Expedientes
@@ -302,5 +303,31 @@ export const db = {
     desarchivosStore = [nuevo, ...desarchivosStore]
     lsSave(LS_KEYS.desarchivos, desarchivosStore)
     return nuevo
+  },
+  // Certificados
+  getCertificados: () => [...certificadosStore],
+  getCertificado: (id: string) => certificadosStore.find(c => c.id === id),
+  createCertificado: (data: Omit<Certificado, 'id' | 'numero' | 'created_at' | 'updated_at'>) => {
+    const numero = certificadosStore.length > 0
+      ? Math.max(...certificadosStore.map(c => c.numero)) + 1
+      : 1
+    const nuevo: Certificado = {
+      ...data, id: 'cert' + Date.now(), numero,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }
+    certificadosStore = [nuevo, ...certificadosStore]
+    lsSave('dom_certificados', certificadosStore)
+    return nuevo
+  },
+  updateCertificado: (id: string, data: Partial<Certificado>) => {
+    certificadosStore = certificadosStore.map(c =>
+      c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c
+    )
+    lsSave('dom_certificados', certificadosStore)
+    return certificadosStore.find(c => c.id === id)
+  },
+  deleteCertificado: (id: string) => {
+    certificadosStore = certificadosStore.filter(c => c.id !== id)
+    lsSave('dom_certificados', certificadosStore)
   },
 }

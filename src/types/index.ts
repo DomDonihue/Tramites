@@ -58,6 +58,69 @@ export interface Expediente {
   docs_en_archivo?: DocDesarchivo[]
 }
 
+// ── Certificados ────────────────────────────────────────────────
+export type TipoCertificado =
+  | 'NUMERO'
+  | 'RURALIDAD'
+  | 'URBANIZACION'
+  | 'AFECTACION_UTILIDAD_PUBLICA'
+  | 'INFORMACIONES_PREVIAS'
+  | 'VIVIENDA_SOCIAL'
+  | 'LOCALIZACION'
+  | 'ZONIFICACION'
+  | 'OTROS'
+
+export type EstadoCertificado = 'POR_ENTREGAR' | 'ENTREGADO'
+
+export const TIPO_CERT_LABELS: Record<TipoCertificado, string> = {
+  NUMERO:                    'Número',
+  RURALIDAD:                 'Ruralidad',
+  URBANIZACION:              'Urbanización',
+  AFECTACION_UTILIDAD_PUBLICA: 'Afectación a Utilidad Pública',
+  INFORMACIONES_PREVIAS:     'Informaciones Previas',
+  VIVIENDA_SOCIAL:           'Vivienda Social',
+  LOCALIZACION:              'Localización',
+  ZONIFICACION:              'Zonificación',
+  OTROS:                     'Otros',
+}
+
+export interface Certificado {
+  id: string
+  numero: number
+  fecha: string
+  solicitante: string
+  rut_solicitante?: string
+  email?: string
+  telefono?: string
+  tipo: TipoCertificado
+  otros_descripcion?: string
+  anotaciones?: string
+  rol_avaluo?: string
+  direccion?: string
+  numero_domicilio?: string
+  localidad?: string
+  manzana?: string
+  lote?: string
+  urbano_rural: 'URBANO' | 'RURAL'
+  numero_asignado?: string
+  fecha_entrega?: string
+  estado: EstadoCertificado
+  // Afectación Utilidad Pública
+  afectacion_vialidad?: boolean
+  afectacion_parque?: boolean
+  afectacion_ensanche?: boolean
+  afectacion_apertura?: boolean
+  vias_afectadas?: string
+  // Pago
+  total_derechos?: number
+  giro_municipal?: string
+  fecha_pago?: string
+  funcionario?: string
+  created_at: string
+  updated_at: string
+}
+
+// ── Desarchivo ───────────────────────────────────────────────────
 export type DocDesarchivo = 'plano' | 'permiso_edificacion' | 'recepcion' | 'eet'
 
 export interface Desarchivo {

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import {
   Building2, Search, FilePlus, BarChart2,
-  Users, LogOut, Menu, X, ChevronRight
+  Users, LogOut, Menu, X, ChevronRight, FileCheck
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -18,6 +18,7 @@ interface NavItem { to: string; icon: ReactNode; label: string; adminOnly?: bool
 const NAV_ITEMS: NavItem[] = [
   { to: '/buscar',      icon: <Search size={18} />,    label: 'Buscar expedientes' },
   { to: '/nuevo',       icon: <FilePlus size={18} />,  label: 'Nuevo expediente' },
+  { to: '/certificados', icon: <FileCheck size={18} />, label: 'Certificados' },
   { to: '/estadisticas',icon: <BarChart2 size={18} />, label: 'Estadísticas' },
   { to: '/usuarios',    icon: <Users size={18} />,     label: 'Usuarios', adminOnly: true },
 ]
