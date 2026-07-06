@@ -23,3 +23,9 @@ export function nivelSemaforo(dias: number): NivelSemaforo {
   if (dias >= 21) return 'amarillo'
   return 'verde'
 }
+
+export function nivelSemaforoCert(dias: number): NivelSemaforo {
+  if (dias >= 7) return 'rojo'
+  if (dias >= 5) return 'amarillo'
+  return 'verde'
+}

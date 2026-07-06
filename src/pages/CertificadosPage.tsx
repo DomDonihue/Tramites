@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye } from 'lucide-react'
+import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye, AlertTriangle } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import {
@@ -10,6 +10,26 @@ import { useToast } from '../hooks/useToast'
 import { ToastContainer } from '../components/ui/Toast'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { PrintCertificado } from '../components/certificados/PrintCertificado'
+import { diasHabilesTranscurridos, nivelSemaforoCert } from '../lib/diasHabiles'
+
+function SemaforoCert({ fecha, estado }: { fecha: string; estado: EstadoCertificado }) {
+  if (estado === 'ENTREGADO') return null
+  const dias = diasHabilesTranscurridos(fecha)
+  const nivel = nivelSemaforoCert(dias)
+  const restantes = Math.max(0, 7 - dias)
+  const cfg = {
+    verde:    { dot: 'bg-green-500',  text: 'text-green-700',  label: `${restantes}d háb.` },
+    amarillo: { dot: 'bg-yellow-400', text: 'text-yellow-700', label: `${restantes}d háb.` },
+    rojo:     { dot: 'bg-red-500',    text: 'text-red-700',    label: dias > 7 ? `+${dias - 7}d vencido` : `${restantes}d háb.` },
+  }[nivel]
+  return (
+    <span title={`${dias} días hábiles desde la solicitud`}
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  )
+}
 
 const TIPOS: TipoCertificado[] = [
   'NUMERO','RURALIDAD','URBANIZACION','AFECTACION_UTILIDAD_PUBLICA',
@@ -334,6 +354,29 @@ export function CertificadosPage() {
         )}
       </div>
 
+      {/* Banner alertas */}
+      {(() => {
+        const criticos = todos.filter(c =>
+          c.estado === 'POR_ENTREGAR' &&
+          nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) !== 'verde'
+        )
+        if (criticos.length === 0) return null
+        const rojos    = criticos.filter(c => nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) === 'rojo')
+        const amarillos = criticos.filter(c => nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) === 'amarillo')
+        return (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+            <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-red-800">
+              <span className="font-semibold">Certificados con plazo próximo a vencer:</span>{' '}
+              {rojos.length > 0 && <span className="font-bold text-red-700">{rojos.length} vencido{rojos.length !== 1 ? 's' : ''} o crítico{rojos.length !== 1 ? 's' : ''}</span>}
+              {rojos.length > 0 && amarillos.length > 0 && ', '}
+              {amarillos.length > 0 && <span className="text-yellow-700 font-semibold">{amarillos.length} próximo{amarillos.length !== 1 ? 's' : ''} a vencer</span>}
+              {' '}— plazo máximo 7 días hábiles para entrega.
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Tabla */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="w-full text-xs border-collapse">
@@ -364,14 +407,17 @@ export function CertificadosPage() {
                 <td className="px-2 py-1.5 border border-gray-200 max-w-[120px] truncate">{c.localidad || '—'}</td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">{fmtDate(c.fecha_entrega)}</td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                    c.estado === 'ENTREGADO'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {c.estado === 'ENTREGADO' ? <Check size={9}/> : null}
-                    {c.estado === 'ENTREGADO' ? 'Entregado' : 'Por Entregar'}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      c.estado === 'ENTREGADO'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {c.estado === 'ENTREGADO' ? <Check size={9}/> : null}
+                      {c.estado === 'ENTREGADO' ? 'Entregado' : 'Por Entregar'}
+                    </span>
+                    <SemaforoCert fecha={c.fecha} estado={c.estado} />
+                  </div>
                 </td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">
                   <div className="flex gap-1">
