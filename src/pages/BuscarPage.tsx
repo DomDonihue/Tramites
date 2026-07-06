@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ChevronDown, ChevronUp, X, ChevronRight, Archive } from 'lucide-react'
+import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ChevronDown, ChevronUp, X, ChevronRight, Archive, AlertTriangle } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import { Expediente, Categoria, Estado, Etapa, CATEGORIA_LABELS, ESTADO_CONFIG, ETAPA_LABELS } from '../types'
@@ -9,6 +9,26 @@ import { EstadoBadge, CategoriaBadge } from '../components/ui/Badges'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { useToast } from '../hooks/useToast'
 import { ToastContainer } from '../components/ui/Toast'
+import { diasHabilesTranscurridos, nivelSemaforo } from '../lib/diasHabiles'
+
+function Semaforo({ fecha, estado }: { fecha?: string; estado: string }) {
+  if (estado !== 'en_revision' || !fecha) return null
+  const dias = diasHabilesTranscurridos(fecha)
+  const nivel = nivelSemaforo(dias)
+  const restantes = Math.max(0, 30 - dias)
+  const cfg = {
+    verde:    { dot: 'bg-green-500',  text: 'text-green-700',  label: `${restantes}d háb.` },
+    amarillo: { dot: 'bg-yellow-400', text: 'text-yellow-700', label: `${restantes}d háb.` },
+    rojo:     { dot: 'bg-red-500',    text: 'text-red-700',    label: dias > 30 ? `+${dias - 30}d vencido` : `${restantes}d háb.` },
+  }[nivel]
+  return (
+    <span title={`${dias} días hábiles transcurridos`}
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  )
+}
 
 const TIPO_BUSQUEDA = [
   { value: 'propietario', label: 'Propietario' },
@@ -164,6 +184,28 @@ export function BuscarPage() {
         )}
       </div>
 
+      {/* Banner alertas en revisión */}
+      {(() => {
+        const criticos = db.getExpedientes().filter(e =>
+          e.estado === 'en_revision' && nivelSemaforo(diasHabilesTranscurridos(e.fecha ?? e.created_at)) !== 'verde'
+        )
+        if (criticos.length === 0) return null
+        const rojos = criticos.filter(e => nivelSemaforo(diasHabilesTranscurridos(e.fecha ?? e.created_at)) === 'rojo')
+        const amarillos = criticos.filter(e => nivelSemaforo(diasHabilesTranscurridos(e.fecha ?? e.created_at)) === 'amarillo')
+        return (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+            <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-red-800">
+              <span className="font-semibold">Expedientes con plazo próximo a vencer:</span>{' '}
+              {rojos.length > 0 && <span className="font-bold text-red-700">{rojos.length} vencido{rojos.length !== 1 ? 's' : ''} o crítico{rojos.length !== 1 ? 's' : ''}</span>}
+              {rojos.length > 0 && amarillos.length > 0 && ', '}
+              {amarillos.length > 0 && <span className="text-yellow-700 font-semibold">{amarillos.length} próximo{amarillos.length !== 1 ? 's' : ''} a vencer</span>}
+              {' '}— plazo máximo 30 días hábiles en estado "En revisión".
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Results */}
       {searched && (
         <div>
@@ -184,7 +226,7 @@ export function BuscarPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr>
-                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN'].map(col => (
+                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN','ESTADO'].map(col => (
                       <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
                         {col}
                       </th>
@@ -208,6 +250,12 @@ export function BuscarPage() {
                       <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right">{exp.caja ?? '—'}</td>
                       <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right font-medium">{fmt(exp.total_pesos)}</td>
                       <td className="px-2 py-1.5 border border-gray-200 max-w-[140px] truncate">{exp.direccion}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          <EstadoBadge estado={exp.estado} />
+                          <Semaforo fecha={exp.fecha ?? exp.created_at} estado={exp.estado} />
+                        </div>
+                      </td>
                       <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">
                         <div className="flex gap-1">
                           <button

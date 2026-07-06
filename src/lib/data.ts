@@ -202,10 +202,28 @@ export const mockExpedientes: Expediente[] = [
   },
 ]
 
-// In-memory store
-let expedientesStore = [...mockExpedientes]
-let usuariosStore = [...mockUsuarios]
-let desarchivosStore: Desarchivo[] = []
+// Persistencia localStorage
+const LS_KEYS = {
+  expedientes: 'dom_expedientes',
+  usuarios:    'dom_usuarios',
+  desarchivos: 'dom_desarchivos',
+}
+
+function lsLoad<T>(key: string, fallback: T[]): T[] {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T[]) : fallback
+  } catch { return fallback }
+}
+
+function lsSave(key: string, data: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
+}
+
+// Stores con persistencia
+let expedientesStore: Expediente[] = lsLoad(LS_KEYS.expedientes, mockExpedientes)
+let usuariosStore:    Usuario[]    = lsLoad(LS_KEYS.usuarios,    mockUsuarios)
+let desarchivosStore: Desarchivo[] = lsLoad(LS_KEYS.desarchivos, [])
 
 export const db = {
   // Expedientes
@@ -220,16 +238,19 @@ export const db = {
       documentos: [],
     }
     expedientesStore = [newExp, ...expedientesStore]
+    lsSave(LS_KEYS.expedientes, expedientesStore)
     return newExp
   },
   updateExpediente: (id: string, data: Partial<Expediente>) => {
     expedientesStore = expedientesStore.map(e =>
       e.id === id ? { ...e, ...data, updated_at: new Date().toISOString() } : e
     )
+    lsSave(LS_KEYS.expedientes, expedientesStore)
     return expedientesStore.find(e => e.id === id)
   },
   deleteExpediente: (id: string) => {
     expedientesStore = expedientesStore.filter(e => e.id !== id)
+    lsSave(LS_KEYS.expedientes, expedientesStore)
   },
   addDocumento: (expedienteId: string, doc: Omit<Documento, 'id' | 'created_at'>) => {
     const newDoc: Documento = { ...doc, id: 'd' + Date.now(), created_at: new Date().toISOString() }
@@ -238,6 +259,7 @@ export const db = {
         ? { ...e, documentos: [...(e.documentos || []), newDoc] }
         : e
     )
+    lsSave(LS_KEYS.expedientes, expedientesStore)
     return newDoc
   },
   deleteDocumento: (expedienteId: string, docId: string) => {
@@ -246,26 +268,31 @@ export const db = {
         ? { ...e, documentos: (e.documentos || []).filter(d => d.id !== docId) }
         : e
     )
+    lsSave(LS_KEYS.expedientes, expedientesStore)
   },
   // Usuarios
   getUsuarios: () => [...usuariosStore],
   createUsuario: (data: Omit<Usuario, 'id' | 'created_at'>) => {
     const newUser: Usuario = { ...data, id: 'u' + Date.now(), created_at: new Date().toISOString() }
     usuariosStore = [...usuariosStore, newUser]
+    lsSave(LS_KEYS.usuarios, usuariosStore)
     return newUser
   },
   updateUsuario: (id: string, data: Partial<Usuario>) => {
     usuariosStore = usuariosStore.map(u => u.id === id ? { ...u, ...data } : u)
+    lsSave(LS_KEYS.usuarios, usuariosStore)
     return usuariosStore.find(u => u.id === id)
   },
   deleteUsuario: (id: string) => {
     usuariosStore = usuariosStore.filter(u => u.id !== id)
+    lsSave(LS_KEYS.usuarios, usuariosStore)
   },
   // Inventario de archivo por expediente
   setDocsEnArchivo: (expedienteId: string, docs: import('../types').DocDesarchivo[]) => {
     expedientesStore = expedientesStore.map(e =>
       e.id === expedienteId ? { ...e, docs_en_archivo: docs, updated_at: new Date().toISOString() } : e
     )
+    lsSave(LS_KEYS.expedientes, expedientesStore)
   },
   // Desarchivos
   getDesarchivos: (expedienteId?: string) =>
@@ -273,6 +300,7 @@ export const db = {
   createDesarchivo: (data: Omit<Desarchivo, 'id' | 'created_at'>) => {
     const nuevo: Desarchivo = { ...data, id: 'da' + Date.now(), created_at: new Date().toISOString() }
     desarchivosStore = [nuevo, ...desarchivosStore]
+    lsSave(LS_KEYS.desarchivos, desarchivosStore)
     return nuevo
   },
 }
