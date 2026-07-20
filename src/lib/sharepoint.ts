@@ -141,7 +141,6 @@ function dateOrNull(v: string | undefined | null): string | null {
 function certToSP(c: Partial<Certificado>): Record<string, unknown> {
   return {
     Title:              String(c.numero ?? ''),
-    NumeroCert:         c.numero ?? null,
     Fecha:              dateOrNull(c.fecha),
     Solicitante:        c.solicitante ?? null,
     RutSolicitante:     c.rut_solicitante || null,
@@ -164,11 +163,6 @@ function certToSP(c: Partial<Certificado>): Record<string, unknown> {
     GiroMunicipal:      c.giro_municipal || null,
     FechaPago:          dateOrNull(c.fecha_pago),
     Funcionario:        c.funcionario || null,
-    AfectacionVialidad: c.afectacion_vialidad ?? null,
-    AfectacionParque:   c.afectacion_parque ?? null,
-    AfectacionEnsanche: c.afectacion_ensanche ?? null,
-    AfectacionApertura: c.afectacion_apertura ?? null,
-    ViasAfectadas:      c.vias_afectadas || null,
   }
 }
 
