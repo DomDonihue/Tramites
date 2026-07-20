@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { runSetup, SetupLog } from '../lib/spSetup'
 import { getConfig, saveConfig, DomConfig } from '../lib/config'
-import { spGetUsuarios, spCreateUsuario, spGetExpedientes, spGetCertificados } from '../lib/sharepoint'
+import { spGetUsuarios, spCreateUsuario, spGetExpedientes, spGetCertificados, spCreateExpediente } from '../lib/sharepoint'
 import { db, sincronizarCertificadosToSP } from '../lib/data'
 import { CheckCircle, XCircle, Loader, Database, ArrowRight, Clock, Save, RefreshCw, Upload } from 'lucide-react'
 
@@ -22,6 +22,32 @@ export function SetupPage() {
   const [certProgress, setCertProgress] = useState<{done: number; total: number; ok: number; err: number} | null>(null)
   const [certSyncing, setCertSyncing]   = useState(false)
   const [certResult, setCertResult]     = useState<{ok: number; err: number; total: number} | null>(null)
+
+  // Sync masivo expedientes
+  const [expProgress, setExpProgress] = useState<{done: number; total: number; ok: number; err: number} | null>(null)
+  const [expSyncing, setExpSyncing]   = useState(false)
+  const [expResult, setExpResult]     = useState<{ok: number; err: number; total: number} | null>(null)
+
+  const handleSyncExpedientes = async () => {
+    const pendientes = db.getExpedientes().filter(e => !e.sp_id)
+    const total = pendientes.length
+    if (total === 0) return
+    setExpSyncing(true)
+    setExpResult(null)
+    setExpProgress({ done: 0, total, ok: 0, err: 0 })
+    let ok = 0, err = 0
+    for (const exp of pendientes) {
+      try {
+        const spId = await spCreateExpediente(exp)
+        db.updateExpediente(exp.id, { sp_id: spId })
+        ok++
+      } catch { err++ }
+      setExpProgress({ done: ok + err, total, ok, err })
+    }
+    setExpResult({ ok, err, total })
+    setExpSyncing(false)
+    setExpProgress(null)
+  }
 
   const handleSyncCertificados = async () => {
     setCertSyncing(true)
@@ -289,6 +315,66 @@ export function SetupPage() {
               {certResult.ok} certificados subidos correctamente
               {certResult.err > 0 && ` · ${certResult.err} con error (reintenta más tarde)`}.
               {certResult.ok > 0 && ' Ahora todos los usuarios pueden verlos al iniciar sesión.'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Sync masivo expedientes ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Upload size={18} className="text-dom-navy" />
+          <h2 className="text-base font-semibold text-gray-900">Enviar expedientes a SharePoint</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-1">
+          Los expedientes importados desde Matriz.xlsx solo existen en este navegador.
+          Usa este botón para subirlos a SharePoint.
+        </p>
+        <div className="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2 mb-4">
+          <span>En la app: <strong>{db.getExpedientes().length}</strong></span>
+          <span className="text-gray-300">|</span>
+          <span>Sin sincronizar: <strong className="text-amber-600">{db.getExpedientes().filter(e => !e.sp_id).length}</strong></span>
+        </div>
+
+        {db.getExpedientes().filter(e => !e.sp_id).length === 0 ? (
+          <div className="flex items-center gap-2 text-green-700 bg-green-50 rounded-xl px-3 py-2 text-sm">
+            <CheckCircle size={15}/> Todos los expedientes ya están en SharePoint
+          </div>
+        ) : (
+          <button
+            onClick={handleSyncExpedientes}
+            disabled={expSyncing}
+            className="flex items-center gap-2 px-5 py-2.5 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark disabled:opacity-50 transition-colors"
+          >
+            {expSyncing
+              ? <><Loader size={15} className="animate-spin"/> Subiendo...</>
+              : <><Upload size={15}/> Subir {db.getExpedientes().filter(e => !e.sp_id).length} expedientes a SharePoint</>
+            }
+          </button>
+        )}
+
+        {expSyncing && expProgress && expProgress.total > 0 && (
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>{expProgress.done} / {expProgress.total}</span>
+              <span className="text-green-600">✓ {expProgress.ok}{expProgress.err > 0 && <span className="text-red-500 ml-2">✗ {expProgress.err}</span>}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-dom-navy h-2 rounded-full transition-all"
+                style={{ width: `${Math.round((expProgress.done / expProgress.total) * 100)}%` }} />
+            </div>
+          </div>
+        )}
+
+        {expResult && !expSyncing && (
+          <div className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm ${expResult.err === 0 ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+            {expResult.err === 0
+              ? <CheckCircle size={15} className="mt-0.5 shrink-0 text-green-600"/>
+              : <XCircle size={15} className="mt-0.5 shrink-0 text-amber-600"/>
+            }
+            <span>
+              {expResult.ok} expedientes subidos correctamente
+              {expResult.err > 0 && ` · ${expResult.err} con error`}.
             </span>
           </div>
         )}
