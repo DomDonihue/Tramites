@@ -10,9 +10,9 @@ import { ToastContainer } from '../components/ui/Toast'
 type FilterTab = 'todos' | Perfil
 
 const TABS: { value: FilterTab; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'admin', label: 'Admins' },
-  { value: 'director', label: 'Directores' },
+  { value: 'todos',       label: 'Todos' },
+  { value: 'admin',       label: 'Administradores' },
+  { value: 'director',    label: 'Directores' },
   { value: 'profesional', label: 'Profesionales' },
 ]
 

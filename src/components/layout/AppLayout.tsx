@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import {
   Building2, Search, FilePlus, BarChart2,
-  Users, LogOut, Menu, X, ChevronRight, FileCheck, Settings
+  Users, LogOut, Menu, X, ChevronRight, FileCheck, Settings, FileUp
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/certificados', icon: <FileCheck size={18} />, label: 'Certificados' },
   { to: '/estadisticas',icon: <BarChart2 size={18} />, label: 'Estadísticas' },
   { to: '/usuarios',    icon: <Users size={18} />,     label: 'Usuarios', adminOnly: true },
+  { to: '/importar',    icon: <FileUp size={18} />,    label: 'Importar desde Excel',  adminOnly: true },
   { to: '/setup',       icon: <Settings size={18} />,  label: 'Configurar SharePoint', adminOnly: true },
 ]
 

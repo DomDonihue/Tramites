@@ -1,4 +1,82 @@
-import { Expediente, Usuario, Documento, Desarchivo, Certificado } from '../types'
+import { Expediente, Usuario, Documento, Desarchivo, Certificado, Solicitante } from '../types'
+import {
+  spCreateExpediente, spUpdateExpediente, spDeleteExpediente,
+  spCreateCertificado, spUpdateCertificado, spDeleteCertificado,
+  spCreateDesarchivo,
+  spCreateUsuario, spUpdateUsuario, spDeleteUsuario,
+  spUpsertSolicitante,
+  spLoadAll,
+} from './sharepoint'
+
+// Envío masivo de certificados locales a SharePoint
+export async function sincronizarCertificadosToSP(
+  onProgress?: (done: number, total: number, ok: number, err: number) => void
+): Promise<{ ok: number; err: number; total: number }> {
+  const pendientes = certificadosStore.filter(c => !c.sp_id)
+  const total = pendientes.length
+  let ok = 0, err = 0
+  for (const c of pendientes) {
+    try {
+      const spId = await spCreateCertificado(c)
+      certificadosStore = certificadosStore.map(x => x.id === c.id ? { ...x, sp_id: spId } : x)
+      ok++
+    } catch {
+      err++
+    }
+    onProgress?.(ok + err, total, ok, err)
+  }
+  lsSave('dom_certificados', certificadosStore)
+  return { ok, err, total }
+}
+
+// Carga inicial desde SharePoint (se llama desde App.tsx al montar)
+export async function initFromSharePoint() {
+  try {
+    const { expedientes, certificados, desarchivos, usuarios } = await spLoadAll()
+
+    // Si SP tiene datos → los cargamos (SP es la fuente de verdad)
+    if (expedientes && expedientes.length > 0) {
+      expedientesStore = expedientes
+      lsSave(LS_KEYS.expedientes, expedientesStore)
+    } else if (expedientes !== null) {
+      // SP está vacío → migramos datos locales a SP
+      for (const e of expedientesStore) {
+        if (!e.sp_id) {
+          const spId = await spCreateExpediente(e).catch(() => null)
+          if (spId) e.sp_id = spId
+        }
+      }
+      lsSave(LS_KEYS.expedientes, expedientesStore)
+    }
+
+    if (certificados && certificados.length > 0) {
+      certificadosStore = certificados
+      lsSave('dom_certificados', certificadosStore)
+    } else if (certificados !== null && certificadosStore.length > 0) {
+      for (const c of certificadosStore) {
+        if (!c.sp_id) {
+          const spId = await spCreateCertificado(c).catch(() => null)
+          if (spId) c.sp_id = spId
+        }
+      }
+      lsSave('dom_certificados', certificadosStore)
+    }
+
+    if (desarchivos && desarchivos.length > 0) {
+      desarchivosStore = desarchivos
+      lsSave(LS_KEYS.desarchivos, desarchivosStore)
+    }
+
+    if (usuarios && usuarios.length > 0) {
+      usuariosStore = usuarios
+      lsSave(LS_KEYS.usuarios, usuariosStore)
+    }
+
+    console.log('✅ SharePoint sincronizado')
+  } catch (e) {
+    console.warn('SP no disponible, usando datos locales:', e)
+  }
+}
 
 export const mockUsuarios: Usuario[] = [
   { id: 'u0', nombre: 'Eugenio Novo Calderon', email: 'enovo@mdonihue.cl', perfil: 'admin', activo: true, created_at: '2024-01-01T10:00:00Z' },
@@ -222,9 +300,19 @@ function lsSave(key: string, data: unknown) {
 
 // Stores con persistencia
 let expedientesStore: Expediente[] = lsLoad(LS_KEYS.expedientes, mockExpedientes)
-let usuariosStore:    Usuario[]    = lsLoad(LS_KEYS.usuarios,    mockUsuarios)
-let desarchivosStore: Desarchivo[]  = lsLoad(LS_KEYS.desarchivos, [])
+const PERFIL_NORM: Record<string, string> = {
+  administrador: 'admin', admin: 'admin',
+  director: 'director',
+  profesional: 'profesional',
+}
+function normalizarPerfil(p: string): 'admin' | 'director' | 'profesional' {
+  return (PERFIL_NORM[String(p).toLowerCase()] ?? 'profesional') as 'admin' | 'director' | 'profesional'
+}
+let usuariosStore: Usuario[] = lsLoad(LS_KEYS.usuarios, mockUsuarios)
+  .map(u => ({ ...u, perfil: normalizarPerfil(u.perfil) }))
+let desarchivosStore: Desarchivo[]   = lsLoad(LS_KEYS.desarchivos, [])
 let certificadosStore: Certificado[] = lsLoad('dom_certificados', [])
+let solicitantesStore: Solicitante[] = lsLoad('dom_solicitantes', [])
 
 export const db = {
   // Expedientes
@@ -240,6 +328,10 @@ export const db = {
     }
     expedientesStore = [newExp, ...expedientesStore]
     lsSave(LS_KEYS.expedientes, expedientesStore)
+    spCreateExpediente(newExp).then(spId => {
+      expedientesStore = expedientesStore.map(e => e.id === newExp.id ? { ...e, sp_id: spId } : e)
+      lsSave(LS_KEYS.expedientes, expedientesStore)
+    }).catch(console.warn)
     return newExp
   },
   updateExpediente: (id: string, data: Partial<Expediente>) => {
@@ -247,11 +339,15 @@ export const db = {
       e.id === id ? { ...e, ...data, updated_at: new Date().toISOString() } : e
     )
     lsSave(LS_KEYS.expedientes, expedientesStore)
-    return expedientesStore.find(e => e.id === id)
+    const exp = expedientesStore.find(e => e.id === id)
+    if (exp?.sp_id) spUpdateExpediente(exp.sp_id, exp).catch(console.warn)
+    return exp
   },
   deleteExpediente: (id: string) => {
+    const exp = expedientesStore.find(e => e.id === id)
     expedientesStore = expedientesStore.filter(e => e.id !== id)
     lsSave(LS_KEYS.expedientes, expedientesStore)
+    if (exp?.sp_id) spDeleteExpediente(exp.sp_id).catch(console.warn)
   },
   addDocumento: (expedienteId: string, doc: Omit<Documento, 'id' | 'created_at'>) => {
     const newDoc: Documento = { ...doc, id: 'd' + Date.now(), created_at: new Date().toISOString() }
@@ -277,16 +373,24 @@ export const db = {
     const newUser: Usuario = { ...data, id: 'u' + Date.now(), created_at: new Date().toISOString() }
     usuariosStore = [...usuariosStore, newUser]
     lsSave(LS_KEYS.usuarios, usuariosStore)
+    spCreateUsuario(newUser).then(spId => {
+      usuariosStore = usuariosStore.map(u => u.id === newUser.id ? { ...u, sp_id: spId } : u)
+      lsSave(LS_KEYS.usuarios, usuariosStore)
+    }).catch(console.warn)
     return newUser
   },
   updateUsuario: (id: string, data: Partial<Usuario>) => {
     usuariosStore = usuariosStore.map(u => u.id === id ? { ...u, ...data } : u)
     lsSave(LS_KEYS.usuarios, usuariosStore)
-    return usuariosStore.find(u => u.id === id)
+    const u = usuariosStore.find(u => u.id === id)
+    if (u?.sp_id) spUpdateUsuario(u.sp_id, u).catch(console.warn)
+    return u
   },
   deleteUsuario: (id: string) => {
+    const u = usuariosStore.find(u => u.id === id)
     usuariosStore = usuariosStore.filter(u => u.id !== id)
     lsSave(LS_KEYS.usuarios, usuariosStore)
+    if (u?.sp_id) spDeleteUsuario(u.sp_id).catch(console.warn)
   },
   // Inventario de archivo por expediente
   setDocsEnArchivo: (expedienteId: string, docs: import('../types').DocDesarchivo[]) => {
@@ -302,21 +406,26 @@ export const db = {
     const nuevo: Desarchivo = { ...data, id: 'da' + Date.now(), created_at: new Date().toISOString() }
     desarchivosStore = [nuevo, ...desarchivosStore]
     lsSave(LS_KEYS.desarchivos, desarchivosStore)
+    spCreateDesarchivo({ ...nuevo, documentos_retirados: nuevo.documentos }).catch(console.warn)
     return nuevo
   },
   // Certificados
   getCertificados: () => [...certificadosStore],
   getCertificado: (id: string) => certificadosStore.find(c => c.id === id),
   createCertificado: (data: Omit<Certificado, 'id' | 'numero' | 'created_at' | 'updated_at'>) => {
-    const numero = certificadosStore.length > 0
-      ? Math.max(...certificadosStore.map(c => c.numero)) + 1
-      : 1
+    const esPrevio = data.tipo === 'INFORMACIONES_PREVIAS'
+    const grupo = certificadosStore.filter(c => (c.tipo === 'INFORMACIONES_PREVIAS') === esPrevio)
+    const numero = grupo.length > 0 ? Math.max(...grupo.map(c => c.numero)) + 1 : 1
     const nuevo: Certificado = {
       ...data, id: 'cert' + Date.now(), numero,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     certificadosStore = [nuevo, ...certificadosStore]
     lsSave('dom_certificados', certificadosStore)
+    spCreateCertificado(nuevo).then(spId => {
+      certificadosStore = certificadosStore.map(c => c.id === nuevo.id ? { ...c, sp_id: spId } : c)
+      lsSave('dom_certificados', certificadosStore)
+    }).catch(console.warn)
     return nuevo
   },
   updateCertificado: (id: string, data: Partial<Certificado>) => {
@@ -324,10 +433,61 @@ export const db = {
       c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c
     )
     lsSave('dom_certificados', certificadosStore)
-    return certificadosStore.find(c => c.id === id)
+    const cert = certificadosStore.find(c => c.id === id)
+    if (cert?.sp_id) spUpdateCertificado(cert.sp_id, cert).catch(console.warn)
+    return cert
   },
   deleteCertificado: (id: string) => {
+    const cert = certificadosStore.find(c => c.id === id)
     certificadosStore = certificadosStore.filter(c => c.id !== id)
     lsSave('dom_certificados', certificadosStore)
+    if (cert?.sp_id) spDeleteCertificado(cert.sp_id).catch(console.warn)
+  },
+  limpiarTodosCertificados: () => {
+    certificadosStore = []
+    lsSave('dom_certificados', [])
+  },
+  bulkImportExpedientes: (items: Omit<Expediente, 'id' | 'created_at' | 'updated_at' | 'documentos'>[]) => {
+    const nuevos: Expediente[] = items.map((data, i) => ({
+      ...data,
+      id: 'hist' + Date.now() + i,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      documentos: [],
+    }))
+    expedientesStore = [...nuevos, ...expedientesStore]
+    lsSave(LS_KEYS.expedientes, expedientesStore)
+    return nuevos.length
+  },
+  // Solicitantes
+  getSolicitantes: () => [...solicitantesStore],
+  getSolicitanteByRut: (rut: string) =>
+    solicitantesStore.find(s => s.rut.replace(/\./g,'').replace(/-/g,'') === rut.replace(/\./g,'').replace(/-/g,'')),
+  upsertSolicitante: (data: Omit<Solicitante, 'id' | 'created_at' | 'updated_at'> & { id?: string }) => {
+    const existing = solicitantesStore.find(
+      s => s.rut.replace(/\./g,'').replace(/-/g,'') === data.rut.replace(/\./g,'').replace(/-/g,'')
+    )
+    if (existing) {
+      const updated: Solicitante = { ...existing, ...data, updated_at: new Date().toISOString() }
+      solicitantesStore = solicitantesStore.map(s => s.id === existing.id ? updated : s)
+      lsSave('dom_solicitantes', solicitantesStore)
+      spUpsertSolicitante(updated).then(spId => {
+        solicitantesStore = solicitantesStore.map(s => s.id === updated.id ? { ...s, sp_id: spId } : s)
+        lsSave('dom_solicitantes', solicitantesStore)
+      }).catch(console.warn)
+      return updated
+    } else {
+      const nuevo: Solicitante = {
+        ...data, id: 'sol' + Date.now(),
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }
+      solicitantesStore = [nuevo, ...solicitantesStore]
+      lsSave('dom_solicitantes', solicitantesStore)
+      spUpsertSolicitante(nuevo).then(spId => {
+        solicitantesStore = solicitantesStore.map(s => s.id === nuevo.id ? { ...s, sp_id: spId } : s)
+        lsSave('dom_solicitantes', solicitantesStore)
+      }).catch(console.warn)
+      return nuevo
+    }
   },
 }

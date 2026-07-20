@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
+import { initFromSharePoint } from './lib/data'
 import { AppLayout } from './components/layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { BuscarPage } from './pages/BuscarPage'
@@ -10,6 +12,7 @@ import { UsuariosPage } from './pages/UsuariosPage'
 import { DesarchivePage } from './pages/DesarchivePage'
 import { CertificadosPage } from './pages/CertificadosPage'
 import { SetupPage } from './pages/SetupPage'
+import { ImportPage } from './pages/ImportPage'
 
 function ProtectedRoutes() {
   const { user, can } = useAuth()
@@ -25,6 +28,7 @@ function ProtectedRoutes() {
         <Route path="/desarchivo/:id" element={<DesarchivePage />} />
         <Route path="/certificados" element={<CertificadosPage />} />
         {can('manageUsers') && <Route path="/setup" element={<SetupPage />} />}
+        {can('manageUsers') && <Route path="/importar" element={<ImportPage />} />}
         {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
         <Route path="*" element={<Navigate to="/buscar" replace />} />
       </Routes>
@@ -34,6 +38,11 @@ function ProtectedRoutes() {
 
 function AuthGate() {
   const { user } = useAuth()
+
+  useEffect(() => {
+    if (user) initFromSharePoint()
+  }, [user])
+
   return (
     <Routes>
       <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />

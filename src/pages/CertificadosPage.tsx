@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye, AlertTriangle, Edit2, UserCheck, SlidersHorizontal } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import {
@@ -59,36 +59,91 @@ export function CertificadosPage() {
   const { toasts, addToast, removeToast } = useToast()
 
   const [view, setView] = useState<'lista'|'form'|'print'>('lista')
+  const [tab, setTab]   = useState<'certificados'|'previos'>('certificados')
   const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [editTarget, setEditTarget] = useState<Certificado | null>(null)
   const [selected, setSelected] = useState<Certificado | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Certificado | null>(null)
-  const [searchQ, setSearchQ] = useState('')
-  const [filterTipo, setFilterTipo] = useState('')
-  const [filterEstado, setFilterEstado] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters]   = useState(false)
+  const [filterTipo,       setFilterTipo]       = useState<TipoCertificado | ''>('')
+  const [filterEstado,     setFilterEstado]     = useState('')
+  const [filterSolic,      setFilterSolic]      = useState('')
+  const [filterRol,        setFilterRol]        = useState('')
+  const [filterLocalidad,  setFilterLocalidad]  = useState('')
+  const [filterFechaDesde, setFilterFechaDesde] = useState('')
+  const [filterFechaHasta, setFilterFechaHasta] = useState('')
 
   const [_r, setR] = useState(0)
-  const refresh = () => setR(n => n+1)
+  const refresh = () => setR(n => n + 1)
+  const [solicitanteConocido, setSolicitanteConocido] = useState(false)
+  const rutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const todos = useMemo(() => db.getCertificados(), [_r])
+  // Sin useMemo para que cada cambio de filtro/pestaña recalcule en fresco
+  const todos: Certificado[] = db.getCertificados()
 
-  const lista = useMemo(() => {
-    let data = todos
-    if (searchQ) {
-      const q = searchQ.toLowerCase()
-      data = data.filter(c =>
-        c.solicitante.toLowerCase().includes(q) ||
-        (c.rol_avaluo ?? '').toLowerCase().includes(q) ||
-        (c.localidad ?? '').toLowerCase().includes(q)
-      )
-    }
-    if (filterTipo) data = data.filter(c => c.tipo === filterTipo)
-    if (filterEstado) data = data.filter(c => c.estado === filterEstado)
-    return data
-  }, [todos, searchQ, filterTipo, filterEstado])
+  /* ── separar por grupo ── */
+  const todosTab = tab === 'previos'
+    ? todos.filter(c => c.tipo === 'INFORMACIONES_PREVIAS')
+    : todos.filter(c => c.tipo !== 'INFORMACIONES_PREVIAS')
+
+  /* ── tipos disponibles en la pestaña actual ── */
+  const TIPOS_TAB = tab === 'previos'
+    ? []
+    : TIPOS.filter(t => t !== 'INFORMACIONES_PREVIAS')
+
+  /* ── lista filtrada y ordenada ── */
+  const lista: Certificado[] = todosTab
+    .filter(c => {
+      if (filterTipo      && c.tipo    !== filterTipo)                                               return false
+      if (filterEstado    && c.estado  !== filterEstado)                                             return false
+      if (filterSolic     && !c.solicitante.toLowerCase().includes(filterSolic.toLowerCase()))       return false
+      if (filterRol       && !(c.rol_avaluo  ?? '').toLowerCase().includes(filterRol.toLowerCase())) return false
+      if (filterLocalidad && !(c.localidad   ?? '').toLowerCase().includes(filterLocalidad.toLowerCase())) return false
+      if (filterFechaDesde && c.fecha < filterFechaDesde)                                            return false
+      if (filterFechaHasta && c.fecha > filterFechaHasta)                                            return false
+      return true
+    })
+    .sort((a, b) => {
+      // Primero por fecha descendente (más reciente primero)
+      if (b.fecha > a.fecha) return 1
+      if (b.fecha < a.fecha) return -1
+      // Mismo día: por número descendente
+      return b.numero - a.numero
+    })
+
+  const activeFiltersCount = [filterEstado, filterSolic, filterRol, filterLocalidad, filterFechaDesde, filterFechaHasta].filter(Boolean).length
+
+  const resetFilters = () => {
+    setFilterTipo(''); setFilterEstado(''); setFilterSolic(''); setFilterRol('')
+    setFilterLocalidad(''); setFilterFechaDesde(''); setFilterFechaHasta('')
+  }
+
+  const cambiarTab = (t: 'certificados'|'previos') => {
+    setTab(t); resetFilters(); setShowFilters(false)
+    if (t === 'previos') setForm(f => ({ ...f, tipo: 'INFORMACIONES_PREVIAS' }))
+    else setForm(f => ({ ...f, tipo: 'NUMERO' }))
+  }
 
   const set = (k: keyof typeof form, v: unknown) =>
     setForm(f => ({ ...f, [k]: v }))
+
+  const handleRutChange = (rut: string) => {
+    set('rut_solicitante', rut)
+    setSolicitanteConocido(false)
+    if (rutTimeoutRef.current) clearTimeout(rutTimeoutRef.current)
+    rutTimeoutRef.current = setTimeout(() => {
+      const found = db.getSolicitanteByRut(rut)
+      if (found) {
+        setForm(f => ({
+          ...f,
+          solicitante: found.nombre,
+          email:       found.email    ?? f.email,
+          telefono:    found.telefono ?? f.telefono,
+        }))
+        setSolicitanteConocido(true)
+      }
+    }, 400)
+  }
 
   const autoFillRol = (rol: string) => {
     set('rol_avaluo', rol)
@@ -99,12 +154,34 @@ export function CertificadosPage() {
     }
   }
 
+  const abrirEditar = (c: Certificado) => {
+    const { id, numero, created_at, updated_at, sp_id, ...rest } = c
+    setForm({ ...EMPTY_FORM, ...rest })
+    setEditTarget(c)
+    setSolicitanteConocido(false)
+    setView('form')
+  }
+
   const handleGuardar = () => {
     if (!form.solicitante.trim()) { addToast('Ingresa el nombre del solicitante.', 'error'); return }
-    const cert = db.createCertificado(form)
-    addToast('Certificado registrado.', 'success')
+    // Guardar/actualizar solicitante si hay RUT
+    if (form.rut_solicitante?.trim()) {
+      db.upsertSolicitante({
+        rut:      form.rut_solicitante.trim(),
+        nombre:   form.solicitante.trim(),
+        email:    form.email    || undefined,
+        telefono: form.telefono || undefined,
+      })
+    }
+    if (editTarget) {
+      db.updateCertificado(editTarget.id, form)
+      addToast('Certificado actualizado.', 'success')
+      setEditTarget(null)
+    } else {
+      db.createCertificado(form)
+      addToast('Certificado registrado.', 'success')
+    }
     refresh()
-    setSelected(cert)
     setView('lista')
     setForm({ ...EMPTY_FORM })
   }
@@ -161,8 +238,12 @@ export function CertificadosPage() {
             <X size={18}/>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Nueva solicitud de certificado</h1>
-            <p className="text-sm text-gray-500">Completa los datos de la solicitud</p>
+            <h1 className="text-xl font-bold text-gray-900">
+              {editTarget ? `Editar certificado N° ${editTarget.numero}` : 'Nueva solicitud de certificado'}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {editTarget ? `${editTarget.solicitante}` : 'Completa los datos de la solicitud'}
+            </p>
           </div>
         </div>
 
@@ -199,10 +280,27 @@ export function CertificadosPage() {
 
           {/* Datos solicitante */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Identificación del solicitante</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Identificación del solicitante</h2>
+              {solicitanteConocido && (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                  <UserCheck size={12}/> Solicitante conocido — datos precargados
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Nombre completo *" value={form.solicitante} onChange={v => set('solicitante',v)} placeholder="Nombre y apellidos"/>
-              <Field label="R.U.T." value={form.rut_solicitante??''} onChange={v => set('rut_solicitante',v)} placeholder="12.345.678-9"/>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">R.U.T. <span className="text-gray-400">(busca automáticamente)</span></label>
+                <input
+                  value={form.rut_solicitante ?? ''}
+                  onChange={e => handleRutChange(e.target.value)}
+                  placeholder="12.345.678-9"
+                  className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 focus:border-dom-navy ${
+                    solicitanteConocido ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
+                />
+              </div>
+              <Field label="Nombre completo *" value={form.solicitante} onChange={v => { set('solicitante',v); setSolicitanteConocido(false) }} placeholder="Nombre y apellidos"/>
               <Field label="E-mail" value={form.email??''} onChange={v => set('email',v)} placeholder="correo@ejemplo.cl"/>
               <Field label="Teléfono" value={form.telefono??''} onChange={v => set('telefono',v)} placeholder="+56 9 1234 5678"/>
               <div>
@@ -287,9 +385,9 @@ export function CertificadosPage() {
           <div className="flex gap-3 pb-6">
             <button onClick={handleGuardar}
               className="flex items-center gap-2 px-6 py-2.5 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
-              <Check size={15}/> Registrar solicitud
+              <Check size={15}/> {editTarget ? 'Guardar cambios' : 'Registrar solicitud'}
             </button>
-            <button onClick={() => setView('lista')}
+            <button onClick={() => { setView('lista'); setEditTarget(null); setForm({ ...EMPTY_FORM }) }}
               className="px-4 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
               Cancelar
             </button>
@@ -307,71 +405,136 @@ export function CertificadosPage() {
         message={`¿Eliminar la solicitud de "${deleteTarget?.solicitante}"?`}
         onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)}/>
 
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Certificados</h1>
-          <p className="text-sm text-gray-500">Solicitudes y emisión de certificados DOM</p>
-        </div>
+      {/* Encabezado */}
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-900">Certificados DOM</h1>
         <button onClick={() => setView('form')}
           className="flex items-center gap-2 px-4 py-2 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
           <FilePlus size={15}/> Nueva solicitud
         </button>
       </div>
 
-      {/* Barra búsqueda */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex-1 relative min-w-48">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Buscar por solicitante, rol o localidad…"
-              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
-          </div>
-          <button onClick={() => setShowFilters(f => !f)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
-            Filtros {showFilters ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+      {/* ── PESTAÑAS ── */}
+      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-2xl w-fit">
+        {([
+          { key: 'certificados', label: 'Certificados', count: todos.filter(c => c.tipo !== 'INFORMACIONES_PREVIAS').length },
+          { key: 'previos',      label: 'Informes Previos', count: todos.filter(c => c.tipo === 'INFORMACIONES_PREVIAS').length },
+        ] as const).map(({ key, label, count }) => (
+          <button key={key} onClick={() => cambiarTab(key)}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              tab === key ? 'bg-white shadow text-dom-navy' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {label} <span className="ml-1 text-xs opacity-60">({count})</span>
           </button>
+        ))}
+      </div>
+
+      {/* ── BOTONES POR TIPO (solo en pestaña Certificados) ── */}
+      {tab === 'certificados' && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button onClick={() => setFilterTipo('')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+              filterTipo === '' ? 'bg-dom-navy text-white border-dom-navy' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}>
+            Todos <span className="ml-1 opacity-60">({todosTab.length})</span>
+          </button>
+          {TIPOS_TAB.filter(t => todosTab.some(c => c.tipo === t)).map(t => (
+            <button key={t} onClick={() => setFilterTipo(filterTipo === t ? '' : t)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                filterTipo === t ? 'bg-dom-navy text-white border-dom-navy' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}>
+              {TIPO_CERT_LABELS[t]} <span className="ml-1 opacity-60">({todosTab.filter(c => c.tipo === t).length})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── PANEL FILTROS ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
+        <div className="flex gap-3 flex-wrap items-center">
+          <button onClick={() => setShowFilters(f => !f)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-colors ${
+              activeFiltersCount > 0 ? 'bg-dom-navy text-white border-dom-navy' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}>
+            {showFilters ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+            Filtros
+            {activeFiltersCount > 0 && (
+              <span className="bg-white text-dom-navy rounded-full px-1.5 text-[10px] font-bold">{activeFiltersCount}</span>
+            )}
+          </button>
+          {activeFiltersCount > 0 && (
+            <button onClick={resetFilters} className="flex items-center gap-1 px-3 py-2 text-xs text-red-600 border border-red-100 rounded-xl hover:bg-red-50">
+              <X size={12}/> Limpiar filtros
+            </button>
+          )}
         </div>
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Tipo</label>
-              <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none">
-                <option value="">Todos</option>
-                {TIPOS.map(t => <option key={t} value={t}>{TIPO_CERT_LABELS[t]}</option>)}
-              </select>
-            </div>
+          <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3 md:grid-cols-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Estado</label>
               <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none">
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-dom-navy/30">
                 <option value="">Todos</option>
                 <option value="POR_ENTREGAR">Por Entregar</option>
                 <option value="ENTREGADO">Entregado</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Solicitante</label>
+              <div className="relative">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"/>
+                <input value={filterSolic} onChange={e => setFilterSolic(e.target.value)} placeholder="Nombre…"
+                  className="w-full pl-6 pr-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">ROL de Avalúo</label>
+              <div className="relative">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"/>
+                <input value={filterRol} onChange={e => setFilterRol(e.target.value)} placeholder="Ej: 113-19"
+                  className="w-full pl-6 pr-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Localidad</label>
+              <div className="relative">
+                <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"/>
+                <input value={filterLocalidad} onChange={e => setFilterLocalidad(e.target.value)} placeholder="Localidad…"
+                  className="w-full pl-6 pr-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Fecha desde</label>
+              <input type="date" value={filterFechaDesde} onChange={e => setFilterFechaDesde(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Fecha hasta</label>
+              <input type="date" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Banner alertas */}
+      {/* Banner alertas — solo pestaña activa */}
       {(() => {
-        const criticos = todos.filter(c =>
+        const criticos = todosTab.filter(c =>
           c.estado === 'POR_ENTREGAR' &&
           nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) !== 'verde'
         )
         if (criticos.length === 0) return null
-        const rojos    = criticos.filter(c => nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) === 'rojo')
+        const rojos     = criticos.filter(c => nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) === 'rojo')
         const amarillos = criticos.filter(c => nivelSemaforoCert(diasHabilesTranscurridos(c.fecha)) === 'amarillo')
         return (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-start gap-3">
             <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
             <div className="text-xs text-red-800">
-              <span className="font-semibold">Certificados con plazo próximo a vencer:</span>{' '}
-              {rojos.length > 0 && <span className="font-bold text-red-700">{rojos.length} vencido{rojos.length !== 1 ? 's' : ''} o crítico{rojos.length !== 1 ? 's' : ''}</span>}
+              <span className="font-semibold">Plazo próximo a vencer:</span>{' '}
+              {rojos.length > 0 && <span className="font-bold text-red-700">{rojos.length} vencido{rojos.length !== 1 ? 's' : ''}</span>}
               {rojos.length > 0 && amarillos.length > 0 && ', '}
               {amarillos.length > 0 && <span className="text-yellow-700 font-semibold">{amarillos.length} próximo{amarillos.length !== 1 ? 's' : ''} a vencer</span>}
-              {' '}— plazo máximo 7 días hábiles para entrega.
+              {' '}— plazo máximo 7 días hábiles.
             </div>
           </div>
         )
@@ -382,7 +545,7 @@ export function CertificadosPage() {
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>
-              {['N°','FECHA','SOLICITANTE','TIPO CERTIFICADO','ANOTACIONES','ROL DE AVALÚO','LOCALIDAD','FECHA ENTREGA','ENTREGADO',''].map(col => (
+              {['N°','FECHA','SOLICITANTE','TIPO','ANOTACIONES','ROL DE AVALÚO','LOCALIDAD','FECHA ENTREGA','ESTADO',''].map(col => (
                 <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
                   {col}
                 </th>
@@ -392,7 +555,7 @@ export function CertificadosPage() {
           <tbody>
             {lista.length === 0 ? (
               <tr><td colSpan={10} className="text-center py-12 text-gray-400">
-                No hay certificados registrados.
+                No hay registros para mostrar.
               </td></tr>
             ) : lista.map((c, i) => (
               <tr key={c.id} className={i % 2 === 0 ? 'bg-white hover:bg-yellow-50' : 'bg-gray-50 hover:bg-yellow-50'}>
@@ -400,7 +563,10 @@ export function CertificadosPage() {
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">{fmtDate(c.fecha)}</td>
                 <td className="px-2 py-1.5 border border-gray-200 font-medium max-w-[160px] truncate">{c.solicitante}</td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
-                  {c.tipo === 'OTROS' ? c.otros_descripcion || 'Otros' : TIPO_CERT_LABELS[c.tipo]}
+                  {tab === 'previos'
+                    ? <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold text-[10px]">Informe Previo</span>
+                    : (c.tipo === 'OTROS' ? c.otros_descripcion || 'Otros' : TIPO_CERT_LABELS[c.tipo])
+                  }
                 </td>
                 <td className="px-2 py-1.5 border border-gray-200 max-w-[140px] truncate text-gray-500">{c.anotaciones || '—'}</td>
                 <td className="px-2 py-1.5 border border-gray-200 font-mono">{c.rol_avaluo || '—'}</td>
@@ -421,6 +587,11 @@ export function CertificadosPage() {
                 </td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">
                   <div className="flex gap-1">
+                    <button onClick={() => abrirEditar(c)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs border border-blue-100 rounded hover:bg-blue-50 text-blue-600"
+                      title="Editar">
+                      <Edit2 size={11}/>
+                    </button>
                     <button onClick={() => abrirImprimir(c)}
                       className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-200 rounded hover:bg-gray-100 text-gray-600"
                       title="Ver e imprimir">

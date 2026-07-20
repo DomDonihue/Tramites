@@ -15,10 +15,12 @@ export type TipoDoc = 'PERMISO' | 'ANTEPROYECTO' | 'PLANO' | 'CERTIFICADO' | 'RE
 
 export interface Usuario {
   id: string
+  sp_id?: string
   nombre: string
   email: string
   perfil: Perfil
   activo: boolean
+  cargo?: string
   created_at: string
 }
 
@@ -33,6 +35,7 @@ export interface Documento {
 
 export interface Expediente {
   id: string
+  sp_id?: string
   ano: number
   numero: string
   fecha?: string
@@ -86,6 +89,7 @@ export const TIPO_CERT_LABELS: Record<TipoCertificado, string> = {
 
 export interface Certificado {
   id: string
+  sp_id?: string
   numero: number
   fecha: string
   solicitante: string
@@ -125,10 +129,12 @@ export type DocDesarchivo = 'plano' | 'permiso_edificacion' | 'recepcion' | 'eet
 
 export interface Desarchivo {
   id: string
+  sp_id?: string
   expediente_id: string
   solicitante: string
   rut_solicitante?: string
   documentos: DocDesarchivo[]
+  documentos_retirados?: DocDesarchivo[]
   fecha: string
   funcionario?: string
   created_at: string
@@ -139,6 +145,17 @@ export const DOC_DESARCHIVO_LABELS: Record<DocDesarchivo, string> = {
   permiso_edificacion: 'Permiso de Edificación',
   recepcion: 'Recepción',
   eet: 'EET (Especificaciones Técnicas)',
+}
+
+export interface Solicitante {
+  id: string
+  sp_id?: string
+  rut: string
+  nombre: string
+  email?: string
+  telefono?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface AuthUser {

@@ -1,24 +1,28 @@
 import { msalInstance } from './auth'
 
-const GRAPH = 'https://graph.microsoft.com/v1.0'
-const SITE_PATH = 'mdonihue.sharepoint.com:/sites/DOMExpediente'
+const SITE_URL = 'https://mdonihue.sharepoint.com/sites/DOMExpediente'
+const SP_SCOPE  = 'https://mdonihue.sharepoint.com/AllSites.Write'
 
 async function getToken() {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0]
-  const result = await msalInstance.acquireTokenSilent({
-    scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
-    account,
-  })
-  return result.accessToken
+  const scopes  = [SP_SCOPE]
+  try {
+    const r = await msalInstance.acquireTokenSilent({ scopes, account })
+    return r.accessToken
+  } catch {
+    const r = await msalInstance.acquireTokenPopup({ scopes, account })
+    return r.accessToken
+  }
 }
 
-async function api(path: string, method = 'GET', body?: unknown) {
+async function spApi(path: string, method = 'GET', body?: unknown) {
   const token = await getToken()
-  const res = await fetch(`${GRAPH}${path}`, {
+  const res = await fetch(`${SITE_URL}/_api${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      Accept: 'application/json;odata=nometadata',
+      'Content-Type': 'application/json;odata=nometadata',
     },
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -30,47 +34,55 @@ async function api(path: string, method = 'GET', body?: unknown) {
   return res.json()
 }
 
-async function getSiteId() {
-  const data = await api(`/sites/${SITE_PATH}`)
-  return data.id as string
-}
-
-async function getListId(siteId: string, name: string): Promise<string | null> {
-  const data = await api(`/sites/${siteId}/lists?$filter=displayName eq '${name}'`)
-  return data.value?.[0]?.id ?? null
-}
-
-async function createList(siteId: string, name: string): Promise<string> {
-  const existing = await getListId(siteId, name)
-  if (existing) return existing
-  const data = await api(`/sites/${siteId}/lists`, 'POST', {
-    displayName: name,
-    list: { template: 'genericList' },
-  })
-  return data.id as string
-}
-
-// Tipos de columna para Graph API
-type ColDef = { name: string; type: 'text' | 'number' | 'dateTime' | 'boolean' | 'choice'; choices?: string[] }
-
-async function addColumn(siteId: string, listId: string, col: ColDef) {
-  const base: Record<string, unknown> = { name: col.name, enforceUniqueValues: false }
-  if (col.type === 'text')     base.text = {}
-  if (col.type === 'number')   base.number = {}
-  if (col.type === 'dateTime') base.dateTime = { format: 'dateOnly' }
-  if (col.type === 'boolean')  base.boolean = {}
-  if (col.type === 'choice')   base.choice = { choices: col.choices ?? [] }
+async function listExists(name: string): Promise<boolean> {
   try {
-    await api(`/sites/${siteId}/lists/${listId}/columns`, 'POST', base)
+    await spApi(`/web/lists/getbytitle('${name}')`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function createList(name: string): Promise<void> {
+  if (await listExists(name)) return
+  await spApi('/web/lists', 'POST', {
+    Title: name,
+    BaseTemplate: 100,
+    AllowContentTypes: false,
+  })
+}
+
+type ColDef = {
+  name: string
+  type: 'text' | 'number' | 'dateTime' | 'boolean' | 'choice'
+  choices?: string[]
+}
+
+// FieldTypeKind: Text=2, Number=9, DateTime=4, Boolean=8, Choice=6
+const FIELD_KIND: Record<ColDef['type'], number> = {
+  text: 2, number: 9, dateTime: 4, boolean: 8, choice: 6,
+}
+
+async function addColumn(listName: string, col: ColDef): Promise<void> {
+  const body: Record<string, unknown> = {
+    Title: col.name,
+    FieldTypeKind: FIELD_KIND[col.type],
+    Required: false,
+  }
+  if (col.type === 'choice' && col.choices) {
+    body.Choices = { results: col.choices }
+  }
+  try {
+    await spApi(`/web/lists/getbytitle('${listName}')/fields`, 'POST', body)
   } catch (e: any) {
-    // Ignorar error si la columna ya existe
-    if (!e.message?.includes('already exists') && !e.message?.includes('duplicateColumn')) {
-      console.warn(`Columna ${col.name}:`, e.message)
+    // Ignorar si ya existe
+    if (!e.message?.includes('already exists') && !e.message?.includes('duplicat')) {
+      console.warn(`Col ${col.name}:`, e.message)
     }
   }
 }
 
-// ── Definición de listas ────────────────────────────────────────────────────
+// ── Definición de columnas ───────────────────────────────────────────────────
 
 const COLS_EXPEDIENTES: ColDef[] = [
   { name: 'Numero',       type: 'text' },
@@ -95,7 +107,7 @@ const COLS_EXPEDIENTES: ColDef[] = [
   { name: 'DocsEnArchivo',type: 'text' },
   { name: 'PatenteProfesional', type: 'text' },
   { name: 'Fuente',       type: 'text' },
-  { name: 'CreatedBy_',   type: 'text' },
+  { name: 'CreadoPor',    type: 'text' },
 ]
 
 const COLS_CERTIFICADOS: ColDef[] = [
@@ -120,7 +132,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'UrbanoRural',      type: 'choice', choices: ['URBANO','RURAL'] },
   { name: 'NumeroAsignado',   type: 'text' },
   { name: 'FechaEntrega',     type: 'dateTime' },
-  { name: 'Estado',           type: 'choice', choices: ['POR_ENTREGAR','ENTREGADO'] },
+  { name: 'EstadoCert',       type: 'choice', choices: ['POR_ENTREGAR','ENTREGADO'] },
   { name: 'TotalDerechos',    type: 'number' },
   { name: 'GiroMunicipal',    type: 'text' },
   { name: 'FechaPago',        type: 'dateTime' },
@@ -130,6 +142,12 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'AfectacionEnsanche', type: 'boolean' },
   { name: 'AfectacionApertura', type: 'boolean' },
   { name: 'ViasAfectadas',    type: 'text' },
+]
+
+const COLS_SOLICITANTE: ColDef[] = [
+  { name: 'Nombre',   type: 'text' },
+  { name: 'Email',    type: 'text' },
+  { name: 'Telefono', type: 'text' },
 ]
 
 const COLS_DESARCHIVOS: ColDef[] = [
@@ -148,37 +166,54 @@ export type SetupLog = { msg: string; ok: boolean }
 export async function runSetup(onLog: (log: SetupLog) => void): Promise<void> {
   const log = (msg: string, ok = true) => onLog({ msg, ok })
 
-  log('🔗 Conectando con SharePoint...')
-  const siteId = await getSiteId()
-  log(`✅ Sitio encontrado: ${siteId.split(',')[1] ?? siteId}`)
+  log('Conectando con SharePoint...')
+  // Verificar acceso
+  try {
+    await spApi('/web?$select=Title')
+    log('Sitio DOM Expediente accesible')
+  } catch (e: any) {
+    log(`Error de conexión: ${e.message}`, false)
+    throw e
+  }
 
   const listas: { name: string; cols: ColDef[] }[] = [
-    { name: 'Expedientes',  cols: COLS_EXPEDIENTES },
+    { name: 'Expediente',   cols: COLS_EXPEDIENTES },
     { name: 'Certificados', cols: COLS_CERTIFICADOS },
-    { name: 'Desarchivos',  cols: COLS_DESARCHIVOS },
+    { name: 'Desarchivo',   cols: COLS_DESARCHIVOS },
+    { name: 'Solicitante',  cols: COLS_SOLICITANTE },
   ]
 
   for (const lista of listas) {
-    log(`📋 Creando lista "${lista.name}"...`)
-    let listId: string
-    try {
-      listId = await createList(siteId, lista.name)
-      log(`✅ Lista "${lista.name}" lista`)
-    } catch (e: any) {
-      log(`❌ Error creando "${lista.name}": ${e.message}`, false)
+    log(`Verificando lista "${lista.name}"...`)
+    const existe = await listExists(lista.name)
+    if (!existe) {
+      log(`❌ Lista "${lista.name}" no encontrada — créala manualmente en SharePoint primero`, false)
       continue
     }
-
-    log(`   Agregando ${lista.cols.length} columnas...`)
+    log(`Lista "${lista.name}" encontrada`)
+    log(`Agregando ${lista.cols.length} columnas a "${lista.name}"...`)
     let ok = 0
     for (const col of lista.cols) {
       try {
-        await addColumn(siteId, listId, col)
+        await addColumn(lista.name, col)
         ok++
-      } catch { /* ignorar duplicados */ }
+      } catch { /* ignorar */ }
     }
-    log(`   ✅ ${ok}/${lista.cols.length} columnas configuradas`)
+    log(`${ok}/${lista.cols.length} columnas configuradas en "${lista.name}"`)
+
+    // Agregar columnas a la vista por defecto
+    try {
+      const viewRes = await spApi(`/web/lists/getbytitle('${lista.name}')/defaultview`)
+      const viewId = (viewRes as any).Id
+      for (const col of lista.cols) {
+        await spApi(
+          `/web/lists/getbytitle('${lista.name}')/views('${viewId}')/viewfields/addviewfield('${col.name}')`,
+          'POST'
+        ).catch(() => {})
+      }
+      log(`Vista actualizada con todas las columnas en "${lista.name}"`)
+    } catch { /* ignorar */ }
   }
 
-  log('🎉 Configuración completada. Las listas están listas en SharePoint.')
+  log('Configuración completada. Las listas están listas en SharePoint.')
 }
