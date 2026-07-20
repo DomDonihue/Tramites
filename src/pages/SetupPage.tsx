@@ -19,9 +19,9 @@ export function SetupPage() {
   const [syncing, setSyncing] = useState(false)
 
   // Sync masivo certificados
-  const [certProgress, setCertProgress] = useState<{done: number; total: number; ok: number; err: number} | null>(null)
+  const [certProgress, setCertProgress] = useState<{done: number; total: number; ok: number; err: number; lastError?: string} | null>(null)
   const [certSyncing, setCertSyncing]   = useState(false)
-  const [certResult, setCertResult]     = useState<{ok: number; err: number; total: number} | null>(null)
+  const [certResult, setCertResult]     = useState<{ok: number; err: number; total: number; lastError?: string} | null>(null)
 
   // Sync masivo expedientes
   const [expProgress, setExpProgress] = useState<{done: number; total: number; ok: number; err: number} | null>(null)
@@ -54,8 +54,8 @@ export function SetupPage() {
     setCertResult(null)
     setCertProgress({ done: 0, total: 0, ok: 0, err: 0 })
     try {
-      const result = await sincronizarCertificadosToSP((done, total, ok, err) => {
-        setCertProgress({ done, total, ok, err })
+      const result = await sincronizarCertificadosToSP((done, total, ok, err, lastError) => {
+        setCertProgress({ done, total, ok, err, lastError })
       })
       setCertResult(result)
     } catch (e: any) {
@@ -301,6 +301,11 @@ export function SetupPage() {
                 style={{ width: `${Math.round((certProgress.done / certProgress.total) * 100)}%` }}
               />
             </div>
+            {certProgress.lastError && (
+              <p className="mt-2 text-xs text-red-600 font-mono bg-red-50 rounded-lg px-2 py-1 break-all">
+                Último error: {certProgress.lastError}
+              </p>
+            )}
           </div>
         )}
 
@@ -311,11 +316,12 @@ export function SetupPage() {
               ? <CheckCircle size={15} className="mt-0.5 shrink-0 text-green-600"/>
               : <XCircle size={15} className="mt-0.5 shrink-0 text-amber-600"/>
             }
-            <span>
-              {certResult.ok} certificados subidos correctamente
-              {certResult.err > 0 && ` · ${certResult.err} con error (reintenta más tarde)`}.
-              {certResult.ok > 0 && ' Ahora todos los usuarios pueden verlos al iniciar sesión.'}
-            </span>
+            <div>
+              <p>{certResult.ok} certificados subidos · {certResult.err} con error</p>
+              {certResult.lastError && (
+                <p className="mt-1 font-mono text-xs break-all opacity-80">Error: {certResult.lastError}</p>
+              )}
+            </div>
           </div>
         )}
       </div>

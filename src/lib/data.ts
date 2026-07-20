@@ -10,23 +10,24 @@ import {
 
 // Envío masivo de certificados locales a SharePoint
 export async function sincronizarCertificadosToSP(
-  onProgress?: (done: number, total: number, ok: number, err: number) => void
-): Promise<{ ok: number; err: number; total: number }> {
+  onProgress?: (done: number, total: number, ok: number, err: number, lastError?: string) => void
+): Promise<{ ok: number; err: number; total: number; lastError?: string }> {
   const pendientes = certificadosStore.filter(c => !c.sp_id)
   const total = pendientes.length
-  let ok = 0, err = 0
+  let ok = 0, err = 0, lastError: string | undefined
   for (const c of pendientes) {
     try {
       const spId = await spCreateCertificado(c)
       certificadosStore = certificadosStore.map(x => x.id === c.id ? { ...x, sp_id: spId } : x)
       ok++
-    } catch {
+    } catch (e: any) {
       err++
+      lastError = e?.message ?? String(e)
     }
-    onProgress?.(ok + err, total, ok, err)
+    onProgress?.(ok + err, total, ok, err, lastError)
   }
   lsSave('dom_certificados', certificadosStore)
-  return { ok, err, total }
+  return { ok, err, total, lastError }
 }
 
 // Carga inicial desde SharePoint (se llama desde App.tsx al montar)
