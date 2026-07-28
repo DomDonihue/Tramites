@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
+import { db } from '../../lib/data'
 import {
   Building2, Search, FilePlus, BarChart2,
   Users, LogOut, Menu, X, ChevronRight, FileCheck, Settings, FileUp
@@ -77,6 +78,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
 
         <NavLinks />
+        {/* Totales del sistema */}
+        <div className="px-4 pb-3 space-y-1 border-t border-gray-100 pt-3 mx-3">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Registros en sistema</div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>Expedientes</span>
+            <span className="font-semibold text-gray-700">{db.getExpedientes().length.toLocaleString('es-CL')}</span>
+          </div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>Certificados</span>
+            <span className="font-semibold text-gray-700">{db.getCertificados().length.toLocaleString('es-CL')}</span>
+          </div>
+        </div>
 
         {/* User footer */}
         <div className="p-3 border-t border-gray-100">

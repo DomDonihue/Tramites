@@ -541,9 +541,9 @@ export function CertificadosPage() {
       })()}
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm" style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
         <table className="w-full text-xs border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr>
               {['N°','FECHA','SOLICITANTE','TIPO','ANOTACIONES','ROL DE AVALÚO','LOCALIDAD','FECHA ENTREGA','ESTADO',''].map(col => (
                 <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">

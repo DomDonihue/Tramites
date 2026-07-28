@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { read, utils, WorkBook } from 'xlsx'
 import { db } from '../lib/data'
 import { Certificado, TipoCertificado, Categoria, Expediente } from '../types'
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader, Trash2, History } from 'lucide-react'
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader, Trash2, History, Merge } from 'lucide-react'
 
 // ── Mapeo de tipos del Excel → tipos internos ─────────────────────────────────
 const TIPO_MAP: Record<string, TipoCertificado> = {
@@ -220,6 +220,12 @@ export function ImportPage() {
     setResult(null)
   }
 
+  const handleDeduplicar = () => {
+    const total = db.deduplicarCertificados()
+    setTotalActual(db.getCertificados().filter(c => !c.sp_id).length)
+    setResult({ ok: total, err: 0 })
+  }
+
   const handleFile = async (file: File) => {
     const buf = await file.arrayBuffer()
     const wb  = read(buf, { type: 'array', cellDates: true })
@@ -302,12 +308,16 @@ export function ImportPage() {
               </p>
             </div>
             {!confirmLimpiar ? (
-              <button
-                onClick={() => setConfirmLimpiar(true)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors"
-              >
-                <Trash2 size={13}/> Limpiar todo
-              </button>
+              <div className="shrink-0 flex gap-2">
+                <button onClick={handleDeduplicar}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white border border-blue-200 text-blue-700 rounded-xl hover:bg-blue-50 transition-colors">
+                  <Merge size={13}/> Deduplicar
+                </button>
+                <button onClick={() => setConfirmLimpiar(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors">
+                  <Trash2 size={13}/> Limpiar
+                </button>
+              </div>
             ) : (
               <div className="shrink-0 flex items-center gap-2">
                 <span className="text-xs text-red-700 font-semibold">¿Confirmar?</span>

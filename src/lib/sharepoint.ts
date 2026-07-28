@@ -111,7 +111,7 @@ function spToExp(f: Record<string, unknown>, spId: string): Expediente {
 }
 
 export async function spGetExpedientes(): Promise<Expediente[]> {
-  const data = await spFetch(`${listItems('Expediente')}?$top=1000&$orderby=Id desc`)
+  const data = await spFetch(`${listItems('Expediente')}?$top=5000&$orderby=Id desc`)
   return (data.value ?? []).map((item: any) => spToExp(item, item.Id))
 }
 
@@ -201,7 +201,7 @@ function spToCert(f: Record<string, unknown>, spId: string): Certificado {
 }
 
 export async function spGetCertificados(): Promise<Certificado[]> {
-  const data = await spFetch(`${listItems('Certificados')}?$top=1000&$orderby=Id desc`)
+  const data = await spFetch(`${listItems('Certificados')}?$top=5000&$orderby=Id desc`)
   return (data.value ?? []).map((item: any) => spToCert(item, item.Id))
 }
 
@@ -249,7 +249,7 @@ function spToDes(f: Record<string, unknown>, spId: string): Desarchivo {
 }
 
 export async function spGetDesarchivos(): Promise<Desarchivo[]> {
-  const data = await spFetch(`${listItems('Desarchivo')}?$top=1000&$orderby=Id desc`)
+  const data = await spFetch(`${listItems('Desarchivo')}?$top=5000&$orderby=Id desc`)
   return (data.value ?? []).map((item: any) => spToDes(item, item.Id))
 }
 
