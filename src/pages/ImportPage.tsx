@@ -5,28 +5,31 @@ import { Certificado, TipoCertificado, Categoria, Expediente } from '../types'
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader, Trash2, History, Merge } from 'lucide-react'
 
 // ── Mapeo de tipos del Excel → tipos internos ─────────────────────────────────
-const TIPO_MAP: Record<string, TipoCertificado> = {
-  'NUMERO':              'NUMERO',
-  'NÚMERO':              'NUMERO',
-  'RURALIDAD':           'RURALIDAD',
-  'URBANIZACION':        'URBANIZACION',
-  'URBANIZACIÓN':        'URBANIZACION',
-  'NO EXPROPIACION':     'AFECTACION_UTILIDAD_PUBLICA',
-  'NO EXPROPIACIÓN':     'AFECTACION_UTILIDAD_PUBLICA',
-  'AFECTACION':          'AFECTACION_UTILIDAD_PUBLICA',
-  'INFORMACIONES PREVIAS': 'INFORMACIONES_PREVIAS',
-  'INFORME PREVIO':      'INFORMACIONES_PREVIAS',
-  'VIVIENDA SOCIAL':     'VIVIENDA_SOCIAL',
-  'LOCALIZACION':        'LOCALIZACION',
-  'LOCALIZACIÓN':        'LOCALIZACION',
-  'ZONIFICACION':        'ZONIFICACION',
-  'ZONIFICACIÓN':        'ZONIFICACION',
+// Normaliza: mayúsculas, sin acentos, espacios colapsados.
+// Así "AFECTACIÓN A UTILIDAD PUBLICA", "afectacion" y "AFECTACION" caen en el mismo tipo.
+function normTipo(s: string): string {
+  return s
+    .toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function mapTipo(raw: string | undefined): TipoCertificado {
   if (!raw) return 'OTROS'
-  const key = String(raw).trim().toUpperCase()
-  return TIPO_MAP[key] ?? 'OTROS'
+  const s = normTipo(String(raw))
+  if (!s) return 'OTROS'
+  if (s.includes('INFORME PREVIO') || (s.includes('INFORMACION') && s.includes('PREVIA')))
+    return 'INFORMACIONES_PREVIAS'
+  if (s.includes('EXPROPIACION') || s.includes('AFECTACION') || s.includes('UTILIDAD PUBLICA'))
+    return 'AFECTACION_UTILIDAD_PUBLICA'
+  if (s.includes('VIVIENDA SOCIAL')) return 'VIVIENDA_SOCIAL'
+  if (s.includes('RURALIDAD'))       return 'RURALIDAD'
+  if (s.includes('URBANIZACION'))    return 'URBANIZACION'
+  if (s.includes('LOCALIZACION'))    return 'LOCALIZACION'
+  if (s.includes('ZONIFICACION'))    return 'ZONIFICACION'
+  if (s.includes('NUMERO'))          return 'NUMERO'
+  return 'OTROS'
 }
 
 function excelDateToStr(val: unknown): string {
@@ -47,10 +50,13 @@ function excelDateToStr(val: unknown): string {
 function parseCertGenerales(rows: Record<string, unknown>[]): Omit<Certificado, 'id' | 'numero' | 'created_at' | 'updated_at'>[] {
   return rows
     .filter(r => r['SOLICITANTE'] || r['Solicitante'])
-    .map(r => ({
+    .map(r => {
+      const tipoRaw = String(r['TIPO CERTIFICADO'] ?? r['Tipo Certificado'] ?? '').trim()
+      const tipo    = mapTipo(tipoRaw)
+      return {
       fecha:          excelDateToStr(r['FECHA'] ?? r['Fecha']),
       solicitante:    String(r['SOLICITANTE'] ?? r['Solicitante'] ?? '').trim(),
-      tipo:           mapTipo(String(r['TIPO CERTIFICADO'] ?? r['Tipo Certificado'] ?? '')),
+      tipo,
       anotaciones:    String(r['ANOTACIONES'] ?? r['Anotaciones'] ?? '').trim() || undefined,
       rol_avaluo:     String(r['ROL DE AVALUO'] ?? r['ROL DE AVALÚO'] ?? '').trim() || undefined,
       localidad:      String(r['LOCALIDAD '] ?? r['LOCALIDAD'] ?? '').trim() || undefined,
@@ -58,12 +64,15 @@ function parseCertGenerales(rows: Record<string, unknown>[]): Omit<Certificado, 
       estado:         (String(r['ENTREGADO '] ?? r['ENTREGADO'] ?? '').trim().toUpperCase() === 'ENTREGADO'
                         ? 'ENTREGADO' : 'POR_ENTREGAR') as Certificado['estado'],
       urbano_rural:   'URBANO' as const,
+      // Si no se pudo clasificar, guardamos el texto original del Excel
+      otros_descripcion: tipo === 'OTROS' && tipoRaw ? tipoRaw : undefined,
       rut_solicitante: undefined,
-      email: undefined, telefono: undefined, otros_descripcion: undefined,
+      email: undefined, telefono: undefined,
       numero_domicilio: undefined, manzana: undefined, lote: undefined,
       numero_asignado: undefined, total_derechos: undefined,
       giro_municipal: undefined, fecha_pago: undefined, funcionario: undefined,
-    }))
+      }
+    })
 }
 
 function parseInformesPrevios(rows: Record<string, unknown>[]): Omit<Certificado, 'id' | 'numero' | 'created_at' | 'updated_at'>[] {
