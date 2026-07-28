@@ -218,6 +218,27 @@ export async function spDeleteCertificado(spId: string): Promise<void> {
   await spDelete(listItem('Certificados', spId))
 }
 
+// Borra TODOS los items de la lista Certificados en SharePoint
+export async function spBorrarTodosCertificados(
+  onProgress?: (done: number, total: number) => void
+): Promise<{ borrados: number; total: number }> {
+  let borrados = 0
+  let total = 0
+  // Se repite porque $top limita la página; se vacía por tandas
+  for (;;) {
+    const data = await spFetch(`${listItems('Certificados')}?$select=Id&$top=1000`)
+    const items: { Id: number }[] = data?.value ?? []
+    if (items.length === 0) break
+    total += items.length
+    for (const it of items) {
+      await spDelete(listItem('Certificados', String(it.Id)))
+      borrados++
+      onProgress?.(borrados, total)
+    }
+  }
+  return { borrados, total }
+}
+
 // ── DESARCHIVOS ──────────────────────────────────────────────────────────────
 
 function desToSP(d: Partial<Desarchivo>): Record<string, unknown> {

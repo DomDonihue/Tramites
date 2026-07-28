@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { runSetup, SetupLog } from '../lib/spSetup'
 import { getConfig, saveConfig, DomConfig } from '../lib/config'
-import { spGetUsuarios, spCreateUsuario, spGetExpedientes, spGetCertificados, spCreateExpediente } from '../lib/sharepoint'
+import { spGetUsuarios, spCreateUsuario, spGetExpedientes, spGetCertificados, spCreateExpediente, spBorrarTodosCertificados } from '../lib/sharepoint'
 import { db, sincronizarCertificadosToSP } from '../lib/data'
 import { CheckCircle, XCircle, Loader, Database, ArrowRight, Clock, Save, RefreshCw, Upload } from 'lucide-react'
 
@@ -27,6 +27,30 @@ export function SetupPage() {
   const [expProgress, setExpProgress] = useState<{done: number; total: number; ok: number; err: number} | null>(null)
   const [expSyncing, setExpSyncing]   = useState(false)
   const [expResult, setExpResult]     = useState<{ok: number; err: number; total: number} | null>(null)
+
+  // Borrado total certificados (SP + local)
+  const [borrarTexto, setBorrarTexto]   = useState('')
+  const [borrando, setBorrando]         = useState(false)
+  const [borrarProg, setBorrarProg]     = useState<{done: number; total: number} | null>(null)
+  const [borrarResult, setBorrarResult] = useState<string | null>(null)
+
+  const handleBorrarTodo = async () => {
+    setBorrando(true)
+    setBorrarResult(null)
+    try {
+      const { borrados } = await spBorrarTodosCertificados((done, total) => {
+        setBorrarProg({ done, total })
+      })
+      db.resetTotalCertificados()
+      setBorrarResult(`${borrados} certificados eliminados de SharePoint y del navegador.`)
+      setBorrarTexto('')
+    } catch (e: any) {
+      setBorrarResult(`Error: ${e.message}`)
+    } finally {
+      setBorrando(false)
+      setBorrarProg(null)
+    }
+  }
 
   const handleSyncExpedientes = async () => {
     const pendientes = db.getExpedientes().filter(e => !e.sp_id)
@@ -435,6 +459,60 @@ export function SetupPage() {
           <strong>¡Listo!</strong> Las listas están configuradas en SharePoint.
         </div>
       )}
+
+      {/* ── Zona de peligro ── */}
+      <div className="bg-white rounded-2xl border-2 border-red-200 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <XCircle size={18} className="text-red-600" />
+          <h2 className="text-base font-semibold text-red-900">Zona de peligro — Borrar certificados</h2>
+        </div>
+        <p className="text-xs text-gray-600 mb-1">
+          Elimina <strong>todos</strong> los certificados de la lista SharePoint y del navegador, para volver a importar los Excel desde cero.
+          Los expedientes no se tocan.
+        </p>
+        <p className="text-xs text-red-700 mb-4">
+          Esta acción no se puede deshacer. Actualmente hay <strong>{db.getCertificados().length}</strong> certificados en la app.
+        </p>
+
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Para confirmar, escribe <span className="font-mono bg-gray-100 px-1 rounded">BORRAR</span>:
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            value={borrarTexto}
+            onChange={e => setBorrarTexto(e.target.value)}
+            placeholder="BORRAR"
+            disabled={borrando}
+            className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-400"
+          />
+          <button
+            onClick={handleBorrarTodo}
+            disabled={borrarTexto !== 'BORRAR' || borrando}
+            className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {borrando
+              ? <><Loader size={15} className="animate-spin"/> Borrando...</>
+              : <>Eliminar todos los certificados</>
+            }
+          </button>
+        </div>
+
+        {borrando && borrarProg && (
+          <p className="mt-3 text-xs text-gray-500 font-mono">
+            {borrarProg.done} eliminados...
+          </p>
+        )}
+
+        {borrarResult && !borrando && (
+          <div className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm ${borrarResult.startsWith('Error') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
+            {borrarResult.startsWith('Error')
+              ? <XCircle size={15} className="mt-0.5 shrink-0 text-red-600"/>
+              : <CheckCircle size={15} className="mt-0.5 shrink-0 text-green-600"/>
+            }
+            <span className="break-all">{borrarResult}</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
