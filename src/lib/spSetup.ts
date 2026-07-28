@@ -124,6 +124,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'OtrosDescripcion', type: 'text' },
   { name: 'Anotaciones',      type: 'text' },
   { name: 'RolAvaluo',        type: 'text' },
+  { name: 'Propietario',      type: 'text' },
   { name: 'Direccion',        type: 'text' },
   { name: 'NumeroDomicilio',  type: 'text' },
   { name: 'Localidad',        type: 'text' },

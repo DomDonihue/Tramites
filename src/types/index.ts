@@ -108,6 +108,7 @@ export interface Certificado {
   otros_descripcion?: string
   anotaciones?: string
   rol_avaluo?: string
+  propietario?: string   // dueño registrado del ROL — corrobora la propiedad
   direccion?: string
   numero_domicilio?: string
   localidad?: string

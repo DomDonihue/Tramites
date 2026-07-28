@@ -47,7 +47,7 @@ function emptyForm(): Omit<Certificado,'id'|'numero'|'created_at'|'updated_at'> 
     fecha,
     solicitante: '', rut_solicitante: '', email: '', telefono: '',
     tipo: 'NUMERO', otros_descripcion: '', anotaciones: '',
-    rol_avaluo: '', direccion: '', numero_domicilio: '', localidad: '',
+    rol_avaluo: '', propietario: '', direccion: '', numero_domicilio: '', localidad: '',
     manzana: '', lote: '', urbano_rural: 'URBANO', numero_asignado: '',
     fecha_entrega: fechaEntregaEstimada(fecha), estado: 'POR_ENTREGAR',
     afectacion_vialidad: false, afectacion_parque: false,
@@ -164,8 +164,8 @@ export function CertificadosPage() {
 
   // Busca el ROL en certificados previos (ya traen los campos separados) y si no,
   // en expedientes (guardan la dirección en una sola línea, hay que separarla).
-  // Los datos de la propiedad se sobrescriben porque pertenecen al ROL indicado;
-  // el nombre del solicitante solo se sugiere si el campo está vacío.
+  // Solo toca los datos de la propiedad: el solicitante puede ser una persona
+  // distinta del propietario, así que ese campo nunca se autocompleta desde aquí.
   const autoFillRol = (rol: string) => {
     set('rol_avaluo', rol)
     const key = normRol(rol)
@@ -175,15 +175,15 @@ export function CertificadosPage() {
     if (cert) {
       setForm(f => ({
         ...f,
+        propietario:      cert.propietario      ?? '',
         direccion:        cert.direccion        ?? '',
         numero_domicilio: cert.numero_domicilio ?? '',
         localidad:        cert.localidad        ?? '',
         manzana:          cert.manzana          ?? '',
         lote:             cert.lote             ?? '',
         urbano_rural:     cert.urbano_rural     || f.urbano_rural,
-        solicitante:      f.solicitante || cert.solicitante || '',
       }))
-      setRolInfo(`Certificado N° ${cert.numero} — ${cert.solicitante}`)
+      setRolInfo(`Certificado N° ${cert.numero}`)
       return
     }
 
@@ -192,11 +192,11 @@ export function CertificadosPage() {
       const { calle, numero } = separarDireccion(exp.direccion ?? '')
       setForm(f => ({
         ...f,
+        propietario:      exp.propietario ?? '',
         direccion:        calle,
         numero_domicilio: numero,
-        solicitante:      f.solicitante || exp.propietario || '',
       }))
-      setRolInfo(`Expediente ${exp.numero} — ${exp.propietario}`)
+      setRolInfo(`Expediente ${exp.numero}`)
       return
     }
     setRolInfo(null)
@@ -364,9 +364,19 @@ export function CertificadosPage() {
                   }`}/>
                 {rolInfo && (
                   <p className="text-[11px] text-green-700 mt-1">
-                    Se precargaron dirección, número y propietario desde el registro. Puedes corregirlos.
+                    Se precargaron propietario, dirección y número desde el registro. Puedes corregirlos.
                   </p>
                 )}
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Propietario registrado <span className="text-gray-400">(según el ROL, puede no ser el solicitante)</span>
+                </label>
+                <input value={form.propietario??''} onChange={e => set('propietario', e.target.value)}
+                  placeholder="Nombre del dueño de la propiedad"
+                  className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 ${
+                    rolInfo && form.propietario ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}/>
               </div>
               <Field label="Calle o camino" value={form.direccion??''} onChange={v => set('direccion',v)} placeholder="Nombre de la calle"/>
               <Field label="Número" value={form.numero_domicilio??''} onChange={v => set('numero_domicilio',v)} placeholder="123"/>
