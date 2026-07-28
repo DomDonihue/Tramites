@@ -210,7 +210,6 @@ export function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [result, setResult]     = useState<{ ok: number; err: number; expeds?: number } | null>(null)
   const [confirmLimpiar, setConfirmLimpiar] = useState(false)
-  const [confirmReset, setConfirmReset]   = useState(false)
   const [totalActual, setTotalActual] = useState(() => db.getCertificados().length)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -218,13 +217,6 @@ export function ImportPage() {
     db.limpiarTodosCertificados()
     setConfirmLimpiar(false)
     setTotalActual(db.getCertificados().length)
-    setResult(null)
-  }
-
-  const handleReset = () => {
-    db.resetTotalCertificados()
-    setConfirmReset(false)
-    setTotalActual(0)
     setResult(null)
   }
 
@@ -321,30 +313,6 @@ export function ImportPage() {
             </button>
           </div>
 
-          {/* Reinicio total */}
-          <div className="border-t border-amber-200 pt-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-red-700">
-              <strong>Reiniciar:</strong> borra todos los certificados del navegador (los de SharePoint se mantienen hasta que los elimines manualmente en SP).
-            </p>
-            {!confirmReset ? (
-              <button onClick={() => setConfirmReset(true)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white border border-red-300 text-red-700 rounded-xl hover:bg-red-50 transition-colors">
-                <Trash2 size={13}/> Reiniciar todo
-              </button>
-            ) : (
-              <div className="shrink-0 flex items-center gap-2">
-                <span className="text-xs text-red-700 font-semibold">¿Confirmar?</span>
-                <button onClick={handleReset}
-                  className="px-3 py-1.5 text-xs font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700">
-                  Sí, borrar todo
-                </button>
-                <button onClick={() => setConfirmReset(false)}
-                  className="px-3 py-1.5 text-xs border border-gray-200 rounded-xl hover:bg-gray-50">
-                  Cancelar
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
