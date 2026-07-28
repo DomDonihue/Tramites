@@ -456,6 +456,10 @@ export const db = {
     certificadosStore = certificadosStore.filter(c => !!c.sp_id)
     lsSave('dom_certificados', certificadosStore)
   },
+  resetTotalCertificados: () => {
+    certificadosStore = []
+    lsSave('dom_certificados', [])
+  },
   deduplicarCertificados: () => {
     const seen = new Set<string>()
     certificadosStore = certificadosStore.filter(c => {
