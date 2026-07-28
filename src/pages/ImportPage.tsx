@@ -210,13 +210,13 @@ export function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [result, setResult]     = useState<{ ok: number; err: number; expeds?: number } | null>(null)
   const [confirmLimpiar, setConfirmLimpiar] = useState(false)
-  const [totalActual, setTotalActual] = useState(() => db.getCertificados().length)
+  const [totalActual, setTotalActual] = useState(() => db.getCertificados().filter(c => !c.sp_id).length)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleLimpiar = () => {
     db.limpiarTodosCertificados()
     setConfirmLimpiar(false)
-    setTotalActual(0)
+    setTotalActual(db.getCertificados().filter(c => !c.sp_id).length)
     setResult(null)
   }
 
@@ -295,11 +295,10 @@ export function ImportPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-amber-800">
-                Hay {totalActual} certificados cargados actualmente
+                Hay {totalActual} certificados sin sincronizar en este navegador
               </p>
               <p className="text-xs text-amber-700 mt-0.5">
-                Si importas un nuevo Excel sin limpiar, los registros se <strong>agregarán</strong> a los existentes y habrá duplicados.
-                Limpia primero si quieres reemplazar todo.
+                "Limpiar" solo elimina los que aún no están en SharePoint. Los ya sincronizados se conservan.
               </p>
             </div>
             {!confirmLimpiar ? (

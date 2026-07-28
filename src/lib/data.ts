@@ -445,8 +445,9 @@ export const db = {
     if (cert?.sp_id) spDeleteCertificado(cert.sp_id).catch(console.warn)
   },
   limpiarTodosCertificados: () => {
-    certificadosStore = []
-    lsSave('dom_certificados', [])
+    // Solo elimina los que NO están en SP; los sincronizados se mantienen
+    certificadosStore = certificadosStore.filter(c => !!c.sp_id)
+    lsSave('dom_certificados', certificadosStore)
   },
   bulkImportExpedientes: (items: Omit<Expediente, 'id' | 'created_at' | 'updated_at' | 'documentos'>[]) => {
     const nuevos: Expediente[] = items.map((data, i) => ({
