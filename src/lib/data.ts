@@ -417,13 +417,6 @@ export const db = {
     const esPrevio = data.tipo === 'INFORMACIONES_PREVIAS'
     const grupo = certificadosStore.filter(c => (c.tipo === 'INFORMACIONES_PREVIAS') === esPrevio)
     const numero = grupo.length > 0 ? Math.max(...grupo.map(c => c.numero)) + 1 : 1
-    // Evitar duplicado por fecha+solicitante+tipo
-    const yaExiste = certificadosStore.some(c =>
-      c.tipo === data.tipo &&
-      c.fecha === data.fecha &&
-      c.solicitante === data.solicitante
-    )
-    if (yaExiste) return null as unknown as Certificado
     const nuevo: Certificado = {
       ...data, id: 'cert' + Date.now(), numero,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
