@@ -47,3 +47,36 @@ export function diasRestantesCert(fechaInicio: string): number {
   const cfg = getConfig()
   return cfg.plazo_certificado_dias - diasHabilesTranscurridos(fechaInicio)
 }
+
+/** YYYY-MM-DD en hora local (evita el corrimiento de día de toISOString). */
+function aISO(d: Date): string {
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+/** Fecha de hoy en formato YYYY-MM-DD. */
+export function hoyISO(): string {
+  return aISO(new Date())
+}
+
+/** Suma días hábiles (lunes a viernes) a una fecha YYYY-MM-DD. */
+export function sumarDiasHabiles(fechaISO: string, dias: number): string {
+  if (!fechaISO) return ''
+  const [y, m, d] = fechaISO.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return ''
+  const cursor = new Date(y, m - 1, d)
+  let restantes = dias
+  while (restantes > 0) {
+    cursor.setDate(cursor.getDate() + 1)
+    const dow = cursor.getDay()
+    if (dow !== 0 && dow !== 6) restantes--
+  }
+  return aISO(cursor)
+}
+
+/** Fecha de entrega estimada según el plazo configurado en Configuración. */
+export function fechaEntregaEstimada(fechaSolicitud: string): string {
+  return sumarDiasHabiles(fechaSolicitud, getConfig().plazo_certificado_dias)
+}

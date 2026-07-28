@@ -10,7 +10,9 @@ import { useToast } from '../hooks/useToast'
 import { ToastContainer } from '../components/ui/Toast'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { PrintCertificado } from '../components/certificados/PrintCertificado'
-import { diasHabilesTranscurridos, nivelSemaforoCert } from '../lib/diasHabiles'
+import { diasHabilesTranscurridos, nivelSemaforoCert, fechaEntregaEstimada, hoyISO } from '../lib/diasHabiles'
+import { formatRut, validarRut, rutIncompleto } from '../lib/rut'
+import { getConfig } from '../lib/config'
 
 function SemaforoCert({ fecha, estado }: { fecha: string; estado: EstadoCertificado }) {
   if (estado === 'ENTREGADO') return null
@@ -36,16 +38,21 @@ const TIPOS: TipoCertificado[] = [
   'INFORMACIONES_PREVIAS','VIVIENDA_SOCIAL','LOCALIZACION','ZONIFICACION','OTROS',
 ]
 
-const EMPTY_FORM: Omit<Certificado,'id'|'numero'|'created_at'|'updated_at'> = {
-  fecha: new Date().toISOString().slice(0,10),
-  solicitante: '', rut_solicitante: '', email: '', telefono: '',
-  tipo: 'NUMERO', otros_descripcion: '', anotaciones: '',
-  rol_avaluo: '', direccion: '', numero_domicilio: '', localidad: '',
-  manzana: '', lote: '', urbano_rural: 'URBANO', numero_asignado: '',
-  fecha_entrega: '', estado: 'POR_ENTREGAR',
-  afectacion_vialidad: false, afectacion_parque: false,
-  afectacion_ensanche: false, afectacion_apertura: false, vias_afectadas: '',
-  total_derechos: undefined, giro_municipal: '', fecha_pago: '',
+// Función y no constante: la fecha de hoy y el plazo configurado se leen
+// al abrir cada formulario, no una sola vez al cargar la app.
+function emptyForm(): Omit<Certificado,'id'|'numero'|'created_at'|'updated_at'> {
+  const fecha = hoyISO()
+  return {
+    fecha,
+    solicitante: '', rut_solicitante: '', email: '', telefono: '',
+    tipo: 'NUMERO', otros_descripcion: '', anotaciones: '',
+    rol_avaluo: '', direccion: '', numero_domicilio: '', localidad: '',
+    manzana: '', lote: '', urbano_rural: 'URBANO', numero_asignado: '',
+    fecha_entrega: fechaEntregaEstimada(fecha), estado: 'POR_ENTREGAR',
+    afectacion_vialidad: false, afectacion_parque: false,
+    afectacion_ensanche: false, afectacion_apertura: false, vias_afectadas: '',
+    total_derechos: undefined, giro_municipal: '', fecha_pago: '',
+  }
 }
 
 function fmtDate(s?: string) {
@@ -60,7 +67,7 @@ export function CertificadosPage() {
 
   const [view, setView] = useState<'lista'|'form'|'print'>('lista')
   const [tab, setTab]   = useState<'certificados'|'previos'>('certificados')
-  const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [form, setForm] = useState(emptyForm())
   const [editTarget, setEditTarget] = useState<Certificado | null>(null)
   const [selected, setSelected] = useState<Certificado | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Certificado | null>(null)
@@ -76,6 +83,7 @@ export function CertificadosPage() {
   const [_r, setR] = useState(0)
   const refresh = () => setR(n => n + 1)
   const [solicitanteConocido, setSolicitanteConocido] = useState(false)
+  const [rolInfo, setRolInfo] = useState<string | null>(null)
   const rutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sin useMemo para que cada cambio de filtro/pestaña recalcule en fresco
@@ -127,7 +135,8 @@ export function CertificadosPage() {
   const set = (k: keyof typeof form, v: unknown) =>
     setForm(f => ({ ...f, [k]: v }))
 
-  const handleRutChange = (rut: string) => {
+  const handleRutChange = (raw: string) => {
+    const rut = formatRut(raw)
     set('rut_solicitante', rut)
     setSolicitanteConocido(false)
     if (rutTimeoutRef.current) clearTimeout(rutTimeoutRef.current)
@@ -145,20 +154,58 @@ export function CertificadosPage() {
     }, 400)
   }
 
+  // Al cambiar la fecha de solicitud se recalcula la entrega según el plazo configurado
+  const handleFechaChange = (fecha: string) => {
+    setForm(f => ({ ...f, fecha, fecha_entrega: fecha ? fechaEntregaEstimada(fecha) : '' }))
+  }
+
+  const normRol = (r: string) => r.trim().replace(/\s+/g, '').toUpperCase()
+
+  // Busca el ROL en certificados previos (traen datos completos de propiedad)
+  // y si no, en expedientes. Solo rellena los campos que estén vacíos.
   const autoFillRol = (rol: string) => {
     set('rol_avaluo', rol)
-    const exp = db.getExpedientes().find(e => e.rol_avaluo === rol.trim())
-    if (exp) {
-      set('direccion', exp.direccion)
-      set('localidad', exp.direccion)
+    const key = normRol(rol)
+    if (!key) { setRolInfo(null); return }
+
+    const cert = db.getCertificados().find(c => normRol(c.rol_avaluo ?? '') === key)
+    if (cert) {
+      setForm(f => ({
+        ...f,
+        direccion:        f.direccion        || cert.direccion        || '',
+        numero_domicilio: f.numero_domicilio || cert.numero_domicilio || '',
+        localidad:        f.localidad        || cert.localidad        || '',
+        manzana:          f.manzana          || cert.manzana          || '',
+        lote:             f.lote             || cert.lote             || '',
+        urbano_rural:     cert.urbano_rural  || f.urbano_rural,
+      }))
+      setRolInfo(`Certificado N° ${cert.numero} — ${cert.solicitante}`)
+      return
     }
+
+    const exp = db.getExpedientes().find(e => normRol(e.rol_avaluo ?? '') === key)
+    if (exp) {
+      setForm(f => ({ ...f, direccion: f.direccion || exp.direccion || '' }))
+      setRolInfo(`Expediente ${exp.numero} — ${exp.propietario}`)
+      return
+    }
+    setRolInfo(null)
   }
 
   const abrirEditar = (c: Certificado) => {
     const { id, numero, created_at, updated_at, sp_id, ...rest } = c
-    setForm({ ...EMPTY_FORM, ...rest })
+    setForm({ ...emptyForm(), ...rest })
     setEditTarget(c)
     setSolicitanteConocido(false)
+    setRolInfo(null)
+    setView('form')
+  }
+
+  const abrirNueva = () => {
+    setEditTarget(null)
+    setForm({ ...emptyForm(), tipo: tab === 'previos' ? 'INFORMACIONES_PREVIAS' : 'NUMERO' })
+    setSolicitanteConocido(false)
+    setRolInfo(null)
     setView('form')
   }
 
@@ -183,7 +230,9 @@ export function CertificadosPage() {
     }
     refresh()
     setView('lista')
-    setForm({ ...EMPTY_FORM })
+    setForm(emptyForm())
+    setSolicitanteConocido(false)
+    setRolInfo(null)
   }
 
   const marcarEntregado = (c: Certificado) => {
@@ -230,6 +279,11 @@ export function CertificadosPage() {
 
   // ── FORM VIEW ────────────────────────────────────────────────
   if (view === 'form') {
+    const rutValor    = form.rut_solicitante ?? ''
+    // Solo se marca inválido cuando ya hay suficientes dígitos para juzgarlo
+    const rutInvalido = !!rutValor && !rutIncompleto(rutValor) && !validarRut(rutValor)
+    const plazoDias   = getConfig().plazo_certificado_dias
+
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -278,6 +332,40 @@ export function CertificadosPage() {
             </div>
           </div>
 
+          {/* Datos propiedad */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Dirección de la propiedad</h2>
+              {rolInfo && (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                  <Check size={12}/> {rolInfo}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  ROL SII <span className="text-gray-400">(busca en trámites y certificados)</span>
+                </label>
+                <input value={form.rol_avaluo??''} onChange={e => autoFillRol(e.target.value)}
+                  placeholder="113-19"
+                  className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 ${
+                    rolInfo ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}/>
+                {rolInfo && (
+                  <p className="text-[11px] text-green-700 mt-1">
+                    Datos de la propiedad precargados. Puedes corregirlos si es necesario.
+                  </p>
+                )}
+              </div>
+              <Field label="Calle o camino" value={form.direccion??''} onChange={v => set('direccion',v)} placeholder="Nombre de la calle"/>
+              <Field label="Número" value={form.numero_domicilio??''} onChange={v => set('numero_domicilio',v)} placeholder="123"/>
+              <Field label="Localidad / Loteo" value={form.localidad??''} onChange={v => set('localidad',v)} placeholder="Localidad"/>
+              <Field label="Manzana" value={form.manzana??''} onChange={v => set('manzana',v)} placeholder=""/>
+              <Field label="Lote N°" value={form.lote??''} onChange={v => set('lote',v)} placeholder=""/>
+            </div>
+          </div>
+
           {/* Datos solicitante */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
@@ -296,41 +384,25 @@ export function CertificadosPage() {
                   onChange={e => handleRutChange(e.target.value)}
                   placeholder="12.345.678-9"
                   className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 focus:border-dom-navy ${
-                    solicitanteConocido ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                    rutInvalido
+                      ? 'border-red-300 bg-red-50'
+                      : solicitanteConocido ? 'border-green-300 bg-green-50' : 'border-gray-200'
                   }`}
                 />
+                {rutInvalido && (
+                  <p className="text-[11px] text-red-600 mt-1">
+                    El RUT no es válido — revisa el dígito verificador.
+                  </p>
+                )}
               </div>
               <Field label="Nombre completo *" value={form.solicitante} onChange={v => { set('solicitante',v); setSolicitanteConocido(false) }} placeholder="Nombre y apellidos"/>
               <Field label="E-mail" value={form.email??''} onChange={v => set('email',v)} placeholder="correo@ejemplo.cl"/>
               <Field label="Teléfono" value={form.telefono??''} onChange={v => set('telefono',v)} placeholder="+56 9 1234 5678"/>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Fecha de solicitud</label>
-                <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)}
+                <input type="date" value={form.fecha} onChange={e => handleFechaChange(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
               </div>
-            </div>
-          </div>
-
-          {/* Datos propiedad */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Dirección de la propiedad</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">ROL SII</label>
-                <div className="relative">
-                  <input value={form.rol_avaluo??''} onChange={e => autoFillRol(e.target.value)}
-                    placeholder="113-19"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
-                  {form.rol_avaluo && db.getExpedientes().some(e => e.rol_avaluo === form.rol_avaluo) && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 text-xs font-medium">✓ encontrado</span>
-                  )}
-                </div>
-              </div>
-              <Field label="Calle o camino" value={form.direccion??''} onChange={v => set('direccion',v)} placeholder="Nombre de la calle"/>
-              <Field label="Número" value={form.numero_domicilio??''} onChange={v => set('numero_domicilio',v)} placeholder="123"/>
-              <Field label="Localidad / Loteo" value={form.localidad??''} onChange={v => set('localidad',v)} placeholder="Localidad"/>
-              <Field label="Manzana" value={form.manzana??''} onChange={v => set('manzana',v)} placeholder=""/>
-              <Field label="Lote N°" value={form.lote??''} onChange={v => set('lote',v)} placeholder=""/>
             </div>
           </div>
 
@@ -411,10 +483,23 @@ export function CertificadosPage() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Fecha entrega estimada</label>
-                <input type="date" value={form.fecha_entrega??''} onChange={e => set('fecha_entrega', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+              <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Fecha de entrega comprometida</label>
+                    <input type="date" value={form.fecha_entrega??''} onChange={e => set('fecha_entrega', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Calculada con el plazo de {plazoDias} días hábiles definido en Configuración. Puedes ajustarla.
+                    </p>
+                  </div>
+                  {form.fecha_entrega && (
+                    <div className="shrink-0 text-right bg-dom-navy-light/30 border border-dom-navy/15 rounded-xl px-4 py-2.5">
+                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Entregar el</div>
+                      <div className="text-lg font-bold text-dom-navy leading-tight">{fmtDate(form.fecha_entrega)}</div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -424,7 +509,7 @@ export function CertificadosPage() {
               className="flex items-center gap-2 px-6 py-2.5 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
               <Check size={15}/> {editTarget ? 'Guardar cambios' : 'Registrar solicitud'}
             </button>
-            <button onClick={() => { setView('lista'); setEditTarget(null); setForm({ ...EMPTY_FORM }) }}
+            <button onClick={() => { setView('lista'); setEditTarget(null); setForm(emptyForm()); setRolInfo(null); setSolicitanteConocido(false) }}
               className="px-4 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
               Cancelar
             </button>
@@ -445,7 +530,7 @@ export function CertificadosPage() {
       {/* Encabezado */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Certificados DOM</h1>
-        <button onClick={() => setView('form')}
+        <button onClick={abrirNueva}
           className="flex items-center gap-2 px-4 py-2 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
           <FilePlus size={15}/> Nueva solicitud
         </button>
