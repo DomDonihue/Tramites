@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { PrintCertificado } from '../components/certificados/PrintCertificado'
 import { diasHabilesTranscurridos, nivelSemaforoCert, fechaEntregaEstimada, hoyISO } from '../lib/diasHabiles'
 import { formatRut, validarRut, rutIncompleto } from '../lib/rut'
+import { separarDireccion } from '../lib/direccion'
 import { getConfig } from '../lib/config'
 
 function SemaforoCert({ fecha, estado }: { fecha: string; estado: EstadoCertificado }) {
@@ -161,8 +162,10 @@ export function CertificadosPage() {
 
   const normRol = (r: string) => r.trim().replace(/\s+/g, '').toUpperCase()
 
-  // Busca el ROL en certificados previos (traen datos completos de propiedad)
-  // y si no, en expedientes. Solo rellena los campos que estén vacíos.
+  // Busca el ROL en certificados previos (ya traen los campos separados) y si no,
+  // en expedientes (guardan la dirección en una sola línea, hay que separarla).
+  // Los datos de la propiedad se sobrescriben porque pertenecen al ROL indicado;
+  // el nombre del solicitante solo se sugiere si el campo está vacío.
   const autoFillRol = (rol: string) => {
     set('rol_avaluo', rol)
     const key = normRol(rol)
@@ -172,12 +175,13 @@ export function CertificadosPage() {
     if (cert) {
       setForm(f => ({
         ...f,
-        direccion:        f.direccion        || cert.direccion        || '',
-        numero_domicilio: f.numero_domicilio || cert.numero_domicilio || '',
-        localidad:        f.localidad        || cert.localidad        || '',
-        manzana:          f.manzana          || cert.manzana          || '',
-        lote:             f.lote             || cert.lote             || '',
-        urbano_rural:     cert.urbano_rural  || f.urbano_rural,
+        direccion:        cert.direccion        ?? '',
+        numero_domicilio: cert.numero_domicilio ?? '',
+        localidad:        cert.localidad        ?? '',
+        manzana:          cert.manzana          ?? '',
+        lote:             cert.lote             ?? '',
+        urbano_rural:     cert.urbano_rural     || f.urbano_rural,
+        solicitante:      f.solicitante || cert.solicitante || '',
       }))
       setRolInfo(`Certificado N° ${cert.numero} — ${cert.solicitante}`)
       return
@@ -185,7 +189,13 @@ export function CertificadosPage() {
 
     const exp = db.getExpedientes().find(e => normRol(e.rol_avaluo ?? '') === key)
     if (exp) {
-      setForm(f => ({ ...f, direccion: f.direccion || exp.direccion || '' }))
+      const { calle, numero } = separarDireccion(exp.direccion ?? '')
+      setForm(f => ({
+        ...f,
+        direccion:        calle,
+        numero_domicilio: numero,
+        solicitante:      f.solicitante || exp.propietario || '',
+      }))
       setRolInfo(`Expediente ${exp.numero} — ${exp.propietario}`)
       return
     }
@@ -354,7 +364,7 @@ export function CertificadosPage() {
                   }`}/>
                 {rolInfo && (
                   <p className="text-[11px] text-green-700 mt-1">
-                    Datos de la propiedad precargados. Puedes corregirlos si es necesario.
+                    Se precargaron dirección, número y propietario desde el registro. Puedes corregirlos.
                   </p>
                 )}
               </div>
