@@ -372,8 +372,45 @@ export function CertificadosPage() {
                 <textarea value={form.anotaciones??''} onChange={e => set('anotaciones',e.target.value)} rows={2}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 resize-none"/>
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Estado de pago</label>
+                <div className="flex gap-2">
+                  {([
+                    ['',          'Sin costo'],
+                    ['POR_PAGAR', 'Por pagar'],
+                    ['PAGADO',    'Pagado'],
+                  ] as const).map(([val, lbl]) => (
+                    <button key={val} type="button"
+                      onClick={() => set('estado_pago', val === '' ? undefined : val)}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-xl border transition-colors ${
+                        (form.estado_pago ?? '') === val
+                          ? val === 'POR_PAGAR'
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : val === 'PAGADO'
+                              ? 'bg-green-600 text-white border-green-600'
+                              : 'bg-dom-navy text-white border-dom-navy'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Deja "Sin costo" si el certificado no genera derechos municipales.
+                </p>
+              </div>
+
               <Field label="Total derechos ($)" value={form.total_derechos?.toString()??''} onChange={v => set('total_derechos', v ? Number(v) : undefined)} placeholder="0" type="number"/>
               <Field label="Giro ingreso municipal N°" value={form.giro_municipal??''} onChange={v => set('giro_municipal',v)} placeholder="N° giro"/>
+
+              {form.estado_pago === 'PAGADO' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha de pago</label>
+                  <input type="date" value={form.fecha_pago??''} onChange={e => set('fecha_pago', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30"/>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Fecha entrega estimada</label>
                 <input type="date" value={form.fecha_entrega??''} onChange={e => set('fecha_entrega', e.target.value)}
@@ -583,6 +620,15 @@ export function CertificadosPage() {
                       {c.estado === 'ENTREGADO' ? 'Entregado' : 'Por Entregar'}
                     </span>
                     <SemaforoCert fecha={c.fecha} estado={c.estado} />
+                    {c.estado_pago && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        c.estado_pago === 'PAGADO'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-300'
+                      }`}>
+                        {c.estado_pago === 'PAGADO' ? 'Pagado' : 'Por pagar'}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">

@@ -133,6 +133,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'NumeroAsignado',   type: 'text' },
   { name: 'FechaEntrega',     type: 'dateTime' },
   { name: 'EstadoCert',       type: 'choice', choices: ['POR_ENTREGAR','ENTREGADO'] },
+  { name: 'EstadoPago',       type: 'text' },
   { name: 'TotalDerechos',    type: 'number' },
   { name: 'GiroMunicipal',    type: 'text' },
   { name: 'FechaPago',        type: 'dateTime' },

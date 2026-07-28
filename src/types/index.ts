@@ -75,6 +75,14 @@ export type TipoCertificado =
 
 export type EstadoCertificado = 'POR_ENTREGAR' | 'ENTREGADO'
 
+// Estado de pago — opcional, solo aplica en certificados con costo
+export type EstadoPago = 'POR_PAGAR' | 'PAGADO'
+
+export const ESTADO_PAGO_LABELS: Record<EstadoPago, string> = {
+  POR_PAGAR: 'Por pagar',
+  PAGADO:    'Pagado',
+}
+
 export const TIPO_CERT_LABELS: Record<TipoCertificado, string> = {
   NUMERO:                    'Número',
   RURALIDAD:                 'Ruralidad',
@@ -116,6 +124,7 @@ export interface Certificado {
   afectacion_apertura?: boolean
   vias_afectadas?: string
   // Pago
+  estado_pago?: EstadoPago   // sin valor = sin costo / no aplica
   total_derechos?: number
   giro_municipal?: string
   fecha_pago?: string
