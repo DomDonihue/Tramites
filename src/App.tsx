@@ -27,6 +27,7 @@ function ProtectedRoutes() {
         <Route path="/repositorio" element={<RepositorioPage />} />
         <Route path="/desarchivo/:id" element={<DesarchivePage />} />
         <Route path="/certificados" element={<CertificadosPage />} />
+        <Route path="/certificados/nuevo" element={<CertificadosPage nuevo />} />
         {can('manageUsers') && <Route path="/setup" element={<SetupPage />} />}
         {can('manageUsers') && <Route path="/importar" element={<ImportPage />} />}
         {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}

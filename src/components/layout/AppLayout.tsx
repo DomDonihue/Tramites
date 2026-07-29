@@ -14,12 +14,15 @@ const PERFIL_BADGE: Record<string, { label: string; cls: string }> = {
   profesional: { label: 'Profesional', cls: 'bg-amber-100 text-amber-700' },
 }
 
-interface NavItem { to: string; icon: ReactNode; label: string; adminOnly?: boolean }
+// end: marca activo solo con coincidencia exacta (evita que "Certificados"
+// se ilumine cuando estamos en "/certificados/nuevo")
+interface NavItem { to: string; icon: ReactNode; label: string; adminOnly?: boolean; end?: boolean }
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/buscar',      icon: <Search size={18} />,    label: 'Buscar expedientes' },
   { to: '/nuevo',       icon: <FilePlus size={18} />,  label: 'Nuevo expediente' },
-  { to: '/certificados', icon: <FileCheck size={18} />, label: 'Certificados' },
+  { to: '/certificados', icon: <FileCheck size={18} />, label: 'Certificados', end: true },
+  { to: '/certificados/nuevo', icon: <FilePlus size={18} />, label: 'Nuevo certificado' },
   { to: '/estadisticas',icon: <BarChart2 size={18} />, label: 'Estadísticas' },
   { to: '/usuarios',    icon: <Users size={18} />,     label: 'Usuarios', adminOnly: true },
   { to: '/importar',    icon: <FileUp size={18} />,    label: 'Importar desde Excel',  adminOnly: true },
@@ -42,6 +45,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <NavLink
           key={item.to}
           to={item.to}
+          end={item.end}
           onClick={() => setMobileOpen(false)}
           className={({ isActive }) =>
             clsx(

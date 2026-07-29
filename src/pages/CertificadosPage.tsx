@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye, AlertTriangle, Edit2, UserCheck, SlidersHorizontal } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
@@ -62,11 +63,12 @@ function fmtDate(s?: string) {
   return `${d}/${m}/${y}`
 }
 
-export function CertificadosPage() {
+export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
   const { can } = useAuth()
+  const navigate = useNavigate()
   const { toasts, addToast, removeToast } = useToast()
 
-  const [view, setView] = useState<'lista'|'form'|'print'>('lista')
+  const [view, setView] = useState<'lista'|'form'|'print'>(nuevo ? 'form' : 'lista')
   const [tab, setTab]   = useState<'certificados'|'previos'>('certificados')
   const [form, setForm] = useState(emptyForm())
   const [editTarget, setEditTarget] = useState<Certificado | null>(null)
@@ -211,12 +213,26 @@ export function CertificadosPage() {
     setView('form')
   }
 
-  const abrirNueva = () => {
+  const limpiarForm = () => {
     setEditTarget(null)
     setForm({ ...emptyForm(), tipo: tab === 'previos' ? 'INFORMACIONES_PREVIAS' : 'NUMERO' })
     setSolicitanteConocido(false)
     setRolInfo(null)
-    setView('form')
+  }
+
+  // La ruta manda: /certificados/nuevo abre el formulario en blanco,
+  // /certificados vuelve al listado.
+  useEffect(() => {
+    if (nuevo) { limpiarForm(); setView('form') }
+    else setView('lista')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nuevo])
+
+  /** Cierra el formulario: si vinimos por la ruta "nuevo", vuelve al listado. */
+  const salirDelForm = () => {
+    limpiarForm()
+    if (nuevo) navigate('/certificados')
+    else setView('lista')
   }
 
   const handleGuardar = () => {
@@ -239,10 +255,7 @@ export function CertificadosPage() {
       addToast('Certificado registrado.', 'success')
     }
     refresh()
-    setView('lista')
-    setForm(emptyForm())
-    setSolicitanteConocido(false)
-    setRolInfo(null)
+    salirDelForm()
   }
 
   const marcarEntregado = (c: Certificado) => {
@@ -298,7 +311,7 @@ export function CertificadosPage() {
       <div className="p-6 max-w-3xl mx-auto">
         <ToastContainer toasts={toasts} onRemove={removeToast} />
         <div className="mb-5 flex items-center gap-3">
-          <button onClick={() => setView('lista')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+          <button onClick={salirDelForm} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
             <X size={18}/>
           </button>
           <div>
@@ -529,7 +542,7 @@ export function CertificadosPage() {
               className="flex items-center gap-2 px-6 py-2.5 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
               <Check size={15}/> {editTarget ? 'Guardar cambios' : 'Registrar solicitud'}
             </button>
-            <button onClick={() => { setView('lista'); setEditTarget(null); setForm(emptyForm()); setRolInfo(null); setSolicitanteConocido(false) }}
+            <button onClick={salirDelForm}
               className="px-4 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">
               Cancelar
             </button>
@@ -550,7 +563,7 @@ export function CertificadosPage() {
       {/* Encabezado */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Certificados DOM</h1>
-        <button onClick={abrirNueva}
+        <button onClick={() => navigate('/certificados/nuevo')}
           className="flex items-center gap-2 px-4 py-2 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark">
           <FilePlus size={15}/> Nueva solicitud
         </button>
