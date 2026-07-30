@@ -113,7 +113,8 @@ export function ExpedienteFormPage() {
       if (isEdit && id) {
         db.updateExpediente(id, form)
       } else {
-        const nuevo = db.createExpediente({ ...form, created_by: user?.id })
+        // El nombre y no el id, para que sea legible también en SharePoint
+        const nuevo = db.createExpediente({ ...form, created_by: user?.nombre })
         expedienteId = nuevo.id
       }
 

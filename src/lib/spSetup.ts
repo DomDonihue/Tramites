@@ -139,6 +139,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'GiroMunicipal',    type: 'text' },
   { name: 'FechaPago',        type: 'dateTime' },
   { name: 'Funcionario',      type: 'text' },
+  { name: 'CreadoPor',        type: 'text' },
   { name: 'AfectacionVialidad', type: 'boolean' },
   { name: 'AfectacionParque',   type: 'boolean' },
   { name: 'AfectacionEnsanche', type: 'boolean' },

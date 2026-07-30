@@ -130,6 +130,7 @@ export interface Certificado {
   giro_municipal?: string
   fecha_pago?: string
   funcionario?: string
+  created_by?: string   // funcionario que registró la solicitud
   created_at: string
   updated_at: string
 }

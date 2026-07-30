@@ -79,6 +79,7 @@ function expToSP(e: Partial<Expediente>): Record<string, unknown> {
     NumPermiso:   e.num_permiso || null,
     Observaciones:e.observaciones || null,
     DocsEnArchivo: e.docs_en_archivo ? JSON.stringify(e.docs_en_archivo) : null,
+    CreadoPor:    e.created_by || null,
   }
 }
 
@@ -104,6 +105,7 @@ function spToExp(f: Record<string, unknown>, spId: string): Expediente {
     observaciones: String(f.Observaciones ?? ''),
     docs_en_archivo: f.DocsEnArchivo ? JSON.parse(String(f.DocsEnArchivo)) : undefined,
     fuente:        String(f.Fuente ?? ''),
+    created_by:    String(f.CreadoPor ?? ''),
     created_at:    String(f.Created ?? new Date().toISOString()),
     updated_at:    String(f.Modified ?? new Date().toISOString()),
     documentos:    [],
@@ -162,6 +164,7 @@ function certToSP(c: Partial<Certificado>): Record<string, unknown> {
     GiroMunicipal:      c.giro_municipal || null,
     FechaPago:          dateOrNull(c.fecha_pago),
     Funcionario:        c.funcionario || null,
+    CreadoPor:          c.created_by || null,
   }
 }
 
@@ -194,6 +197,7 @@ function spToCert(f: Record<string, unknown>, spId: string): Certificado {
     giro_municipal:     String(f.GiroMunicipal ?? ''),
     fecha_pago:         String(f.FechaPago ?? '').split('T')[0],
     funcionario:        String(f.Funcionario ?? ''),
+    created_by:         String(f.CreadoPor ?? ''),
     afectacion_vialidad: Boolean(f.AfectacionVialidad),
     afectacion_parque:   Boolean(f.AfectacionParque),
     afectacion_ensanche: Boolean(f.AfectacionEnsanche),

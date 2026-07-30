@@ -64,7 +64,7 @@ function fmtDate(s?: string) {
 }
 
 export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const navigate = useNavigate()
   const { toasts, addToast, removeToast } = useToast()
 
@@ -251,7 +251,8 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
       addToast('Certificado actualizado.', 'success')
       setEditTarget(null)
     } else {
-      db.createCertificado(form)
+      // Queda registrado qué funcionario ingresó la solicitud
+      db.createCertificado({ ...form, created_by: user?.nombre })
       addToast('Certificado registrado.', 'success')
     }
     refresh()
@@ -700,7 +701,7 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
         <table className="w-full text-xs border-collapse">
           <thead className="sticky top-0 z-10">
             <tr>
-              {['N°','FECHA','SOLICITANTE','TIPO','ANOTACIONES','ROL DE AVALÚO','LOCALIDAD','FECHA ENTREGA','ESTADO',''].map(col => (
+              {['N°','FECHA','SOLICITANTE','TIPO','ANOTACIONES','ROL DE AVALÚO','LOCALIDAD','FECHA ENTREGA','ESTADO','REGISTRADO POR',''].map(col => (
                 <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
                   {col}
                 </th>
@@ -709,7 +710,7 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
           </thead>
           <tbody>
             {lista.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-gray-400">
+              <tr><td colSpan={11} className="text-center py-12 text-gray-400">
                 No hay registros para mostrar.
               </td></tr>
             ) : lista.map((c, i) => (
@@ -748,6 +749,10 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
                       </span>
                     )}
                   </div>
+                </td>
+                <td className="px-2 py-1.5 border border-gray-200 max-w-[130px] truncate text-gray-500"
+                    title={c.created_by || ''}>
+                  {c.created_by || '—'}
                 </td>
                 <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap sticky right-0 bg-white">
                   <div className="flex gap-1">
