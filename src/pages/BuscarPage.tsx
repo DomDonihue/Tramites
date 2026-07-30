@@ -70,8 +70,26 @@ export function BuscarPage() {
     return data
   }, [searched, query, tipoBusqueda, filterCat, filterEtapa, filterEstado, filterAno])
 
+  // Desglose por categoría sobre el total, no sobre los resultados filtrados:
+  // sirve para saber qué hay en el sistema antes de buscar nada.
+  const desglose = useMemo(() => {
+    const todos = db.getExpedientes()
+    return {
+      total: todos.length,
+      cats: (Object.entries(CATEGORIA_LABELS) as [Categoria, string][])
+        .map(([k, label]) => ({ k, label, n: todos.filter(e => e.categoria === k).length }))
+        .filter(c => c.n > 0),
+    }
+  }, [searched])
+
   const doSearch = () => setSearched(true)
   const clearSearch = () => { setQuery(''); setSearched(false) }
+
+  /** Al tocar un chip se filtra y se muestran los resultados de inmediato. */
+  const filtrarPorCat = (cat: string) => {
+    setFilterCat(prev => (prev === cat ? '' : cat))
+    setSearched(true)
+  }
 
   const handleDelete = () => {
     if (!deleteTarget) return
@@ -183,6 +201,26 @@ export function BuscarPage() {
           </div>
         )}
       </div>
+
+      {/* Desglose por categoría — cada número es además un filtro */}
+      {desglose.total > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button onClick={() => { setFilterCat(''); setSearched(true) }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+              filterCat === '' ? 'bg-dom-navy text-white border-dom-navy' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}>
+            Todos <span className="ml-1 opacity-60">({desglose.total.toLocaleString('es-CL')})</span>
+          </button>
+          {desglose.cats.map(c => (
+            <button key={c.k} onClick={() => filtrarPorCat(c.k)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                filterCat === c.k ? 'bg-dom-navy text-white border-dom-navy' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}>
+              {c.label} <span className="ml-1 opacity-60">({c.n.toLocaleString('es-CL')})</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Banner alertas en revisión */}
       {(() => {
