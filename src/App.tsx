@@ -11,6 +11,8 @@ import { RepositorioPage } from './pages/RepositorioPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { DesarchivePage } from './pages/DesarchivePage'
 import { CertificadosPage } from './pages/CertificadosPage'
+import { CertificadosWebPage } from './pages/CertificadosWebPage'
+import { CertificadosWebBandejaPage } from './pages/CertificadosWebBandejaPage'
 import { SetupPage } from './pages/SetupPage'
 import { ImportPage } from './pages/ImportPage'
 
@@ -28,6 +30,9 @@ function ProtectedRoutes() {
         <Route path="/desarchivo/:id" element={<DesarchivePage />} />
         <Route path="/certificados" element={<CertificadosPage />} />
         <Route path="/certificados/nuevo" element={<CertificadosPage nuevo />} />
+        <Route path="/certificados-web" element={<CertificadosWebPage />} />
+        <Route path="/consultar-solicitud" element={<CertificadosWebPage />} />
+        <Route path="/certificados-web/bandeja" element={<CertificadosWebBandejaPage />} />
         {can('manageUsers') && <Route path="/setup" element={<SetupPage />} />}
         {can('manageUsers') && <Route path="/importar" element={<ImportPage />} />}
         {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
@@ -39,25 +44,13 @@ function ProtectedRoutes() {
 
 function AuthGate() {
   const { user } = useAuth()
-
-  useEffect(() => {
-    if (user) initFromSharePoint()
-  }, [user])
-
-  return (
-    <Routes>
-      <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
-      <Route path="/*" element={<ProtectedRoutes />} />
-    </Routes>
-  )
+  useEffect(() => { if (user) initFromSharePoint() }, [user])
+  return <Routes>
+    <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
+    <Route path="/*" element={<ProtectedRoutes />} />
+  </Routes>
 }
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <BrowserRouter basename="/Tramites">
-        <AuthGate />
-      </BrowserRouter>
-    </AuthProvider>
-  )
+  return <AuthProvider><BrowserRouter basename="/Tramites"><AuthGate /></BrowserRouter></AuthProvider>
 }
