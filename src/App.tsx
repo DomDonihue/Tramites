@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { initFromSharePoint } from './lib/data'
 import { AppLayout } from './components/layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
+import { PortalCiudadanoPage } from './pages/PortalCiudadanoPage'
 import { BuscarPage } from './pages/BuscarPage'
 import { ExpedienteFormPage } from './pages/ExpedienteFormPage'
 import { EstadisticasPage } from './pages/EstadisticasPage'
@@ -40,7 +41,8 @@ function AuthGate() {
   const { user } = useAuth()
   useEffect(() => { if (user) initFromSharePoint() }, [user])
   return <Routes>
-    <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
+    <Route path="/" element={<PortalCiudadanoPage />} />
+    <Route path="/profesionales" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
     <Route path="/certificados-web" element={<CertificadosWebPage />} />
     <Route path="/consultar-solicitud" element={<CertificadosWebPage />} />
     <Route path="/*" element={<ProtectedRoutes />} />
