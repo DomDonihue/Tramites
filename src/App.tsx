@@ -15,6 +15,7 @@ import { DesarchivePage } from './pages/DesarchivePage'
 import { CertificadosPage } from './pages/CertificadosPage'
 import { CertificadosWebPage } from './pages/CertificadosWebPage'
 import { CertificadosWebBandejaPage } from './pages/CertificadosWebBandejaPage'
+import { PortalCiudadanoAdminPage } from './pages/PortalCiudadanoAdminPage'
 import { SetupPage } from './pages/SetupPage'
 import { ImportPage } from './pages/ImportPage'
 
@@ -31,6 +32,7 @@ function ProtectedRoutes() {
     <Route path="/certificados" element={<CertificadosPage />} />
     <Route path="/certificados/nuevo" element={<CertificadosPage nuevo />} />
     <Route path="/certificados-web/bandeja" element={<CertificadosWebBandejaPage />} />
+    {can('manageUsers') && <Route path="/portal-admin/certificados" element={<PortalCiudadanoAdminPage />} />}
     {can('manageUsers') && <Route path="/setup" element={<SetupPage />} />}
     {can('manageUsers') && <Route path="/importar" element={<ImportPage />} />}
     {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
@@ -38,9 +40,7 @@ function ProtectedRoutes() {
   </Routes></AppLayout>
 }
 
-function CitizenRoute() {
-  return <CitizenNavigation><CertificadosWebPage /></CitizenNavigation>
-}
+function CitizenRoute() { return <CitizenNavigation><CertificadosWebPage /></CitizenNavigation> }
 
 function AuthGate() {
   const { user } = useAuth()
@@ -53,7 +53,4 @@ function AuthGate() {
     <Route path="/*" element={<ProtectedRoutes />} />
   </Routes>
 }
-
-export default function App() {
-  return <AuthProvider><BrowserRouter basename="/Tramites"><AuthGate /></BrowserRouter></AuthProvider>
-}
+export default function App() { return <AuthProvider><BrowserRouter basename="/Tramites"><AuthGate /></BrowserRouter></AuthProvider> }
