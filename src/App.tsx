@@ -38,7 +38,7 @@ function ProtectedRoutes() {
   </Routes></AppLayout>
 }
 
-function CitizenRoute({ mode }: { mode: 'solicitar' | 'consultar' }) {
+function CitizenRoute() {
   return <CitizenNavigation><CertificadosWebPage /></CitizenNavigation>
 }
 
@@ -48,8 +48,8 @@ function AuthGate() {
   return <Routes>
     <Route path="/" element={<PortalCiudadanoPage />} />
     <Route path="/profesionales" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
-    <Route path="/certificados-web" element={<CitizenRoute mode="solicitar" />} />
-    <Route path="/consultar-solicitud" element={<CitizenRoute mode="consultar" />} />
+    <Route path="/certificados-web" element={<CitizenRoute />} />
+    <Route path="/consultar-solicitud" element={<CitizenRoute />} />
     <Route path="/*" element={<ProtectedRoutes />} />
   </Routes>
 }
