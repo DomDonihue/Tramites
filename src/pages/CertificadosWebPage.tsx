@@ -54,6 +54,21 @@ type FormState = {
   archivos: File[]
 }
 
+/*
+Catálogo de respaldo: se usa cuando VITE_CERTIFICADOS_WEB_CATALOGO_URL no
+está configurado, para que el ciudadano igual pueda ver los certificados
+disponibles sin depender de Power Automate. Si se configura la URL, esta
+lista se reemplaza por la que devuelva SharePoint.
+*/
+const CATALOGO_RESPALDO: CatalogoCertificado[] = [
+  { tipo: 'NUMERO', nombre: 'Número', descripcion: 'Acredita el número domiciliario oficial asignado a una propiedad.', valor: 3600, plazo: '', activo: true, orden: 1 },
+  { tipo: 'INFORMACIONES_PREVIAS', nombre: 'Informaciones Previas', descripcion: 'Informa las condiciones urbanísticas y normas aplicables al predio.', valor: 6700, plazo: '', activo: true, orden: 2 },
+  { tipo: 'RURALIDAD', nombre: 'Ruralidad', descripcion: 'Certifica la condición o ubicación rural del predio.', valor: 3600, plazo: '', activo: true, orden: 3 },
+  { tipo: 'VIVIENDA_SOCIAL', nombre: 'Vivienda Social', descripcion: 'Certifica antecedentes relacionados con la condición de vivienda social.', valor: 3600, plazo: '', activo: true, orden: 4 },
+  { tipo: 'URBANIZACION', nombre: 'Urbanización', descripcion: 'Informa antecedentes relativos a la urbanización del inmueble.', valor: 3600, plazo: '', activo: true, orden: 5 },
+  { tipo: 'LOCALIZACION', nombre: 'Localización', descripcion: 'Informa antecedentes relativos a la localización del predio.', valor: 3600, plazo: '', activo: true, orden: 6 }
+]
+
 function money(value: number) {
   return new Intl.NumberFormat('es-CL', {
     style: 'currency',
@@ -195,10 +210,7 @@ export function CertificadosWebPage() {
       setError('')
 
       if (!CATALOGO_URL) {
-        setError(
-          'Falta configurar VITE_CERTIFICADOS_WEB_CATALOGO_URL en el archivo .env.'
-        )
-
+        setCatalogo(CATALOGO_RESPALDO)
         setLoadingCatalogo(false)
         return
       }
@@ -375,12 +387,13 @@ export function CertificadosWebPage() {
                 a.orden - b.orden
             )
 
-        setCatalogo(certificados)
-      } catch (e: any) {
-        setError(
-          e?.message ??
-            'No fue posible cargar los certificados disponibles.'
+        setCatalogo(
+          certificados.length
+            ? certificados
+            : CATALOGO_RESPALDO
         )
+      } catch (e: any) {
+        setCatalogo(CATALOGO_RESPALDO)
       } finally {
         setLoadingCatalogo(false)
       }
@@ -593,6 +606,12 @@ export function CertificadosWebPage() {
       setSuccess(true)
 
       setStep(6)
+
+      /*
+      Por seguridad de la información: se borran los datos
+      personales del formulario apenas se confirma el envío.
+      */
+      setForm(emptyForm())
     } catch (e: any) {
       setError(
         e?.message ??
@@ -996,7 +1015,14 @@ export function CertificadosWebPage() {
             />
 
             {success ? (
-              <Success folio={folio} />
+              <Success
+                folio={folio}
+                onNuevaSolicitud={() => {
+                  setSuccess(false)
+                  setFolio('')
+                  setStep(1)
+                }}
+              />
             ) : (
               <>
 
@@ -2057,9 +2083,11 @@ function NavButtons({
 */
 
 function Success({
-  folio
+  folio,
+  onNuevaSolicitud
 }: {
   folio: string
+  onNuevaSolicitud: () => void
 }) {
   return (
     <div className="text-center py-10">
@@ -2095,12 +2123,24 @@ function Success({
         Guarde este número. Lo necesitará junto con su RUT para consultar el estado.
       </p>
 
-      <Link
-        to="/consultar-solicitud"
-        className="inline-flex mt-5 bg-dom-navy text-white px-5 py-3 rounded-xl"
-      >
-        Consultar solicitud
-      </Link>
+      <div className="flex flex-wrap gap-3 justify-center mt-5">
+
+        <Link
+          to="/consultar-solicitud"
+          className="inline-flex bg-dom-navy text-white px-5 py-3 rounded-xl"
+        >
+          Consultar solicitud
+        </Link>
+
+        <button
+          type="button"
+          onClick={onNuevaSolicitud}
+          className="inline-flex border border-dom-navy text-dom-navy px-5 py-3 rounded-xl"
+        >
+          Realizar otra solicitud
+        </button>
+
+      </div>
 
     </div>
   )
