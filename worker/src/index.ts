@@ -282,12 +282,15 @@ async function crearSolicitud(req: Request, env: Env): Promise<Response> {
   const nombre = texto(body.nombre)
   const rut = texto(body.rut, 20)
   const email = texto(body.email)
+  const telefonoDigitos = texto(body.telefono, 30).replace(/\D/g, '')
+  const telefono = telefonoDigitos.length === 11 && telefonoDigitos.startsWith('56') ? telefonoDigitos.slice(2) : telefonoDigitos
   const certificados: string[] = Array.isArray(body.certificados) ? body.certificados.map((c: unknown) => texto(c, 60)) : []
   const archivos: Archivo[] = Array.isArray(body.archivos) ? body.archivos : []
 
   if (!nombre) throw new HttpError(400, 'Falta el nombre del solicitante.')
   if (!rutValido(rut)) throw new HttpError(400, 'El RUT no es válido.')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'El correo electrónico no es válido.')
+  if (telefono && telefono.length !== 9) throw new HttpError(400, 'El teléfono debe tener 9 dígitos, solo números.')
   if (!certificados.length) throw new HttpError(400, 'Debe seleccionar al menos un certificado.')
   if (body.aceptaDatos !== true) throw new HttpError(400, 'Debe autorizar el tratamiento de sus datos personales.')
   if (archivos.length > MAX_ARCHIVOS) throw new HttpError(400, `Puede adjuntar hasta ${MAX_ARCHIVOS} archivos.`)
@@ -302,7 +305,7 @@ async function crearSolicitud(req: Request, env: Env): Promise<Response> {
     Solicitante: nombre,
     RutSolicitante: rut,
     Email: email,
-    Telefono: texto(body.telefono, 30),
+    Telefono: telefono,
     TipoCertificado: certificados.join(', '),
     OtrosDescripcion: texto(body.otrosDescripcion),
     RolAvaluo: texto(body.rolAvaluo, 30),
@@ -349,7 +352,7 @@ async function crearSolicitud(req: Request, env: Env): Promise<Response> {
   try {
     const listaSol = await listaPath(env, LISTA_SOLICITANTES)
     const datos = await aSharePoint(env, LISTA_SOLICITANTES, {
-      Title: rut, Nombre: nombre, Email: email, Telefono: texto(body.telefono, 30), FolioSolicitud: folio,
+      Title: rut, Nombre: nombre, Email: email, Telefono: telefono, FolioSolicitud: folio,
     })
     const existentes = await graph(env, `${listaSol}/items?$top=1&$filter=fields/Title eq '${odataStr(rut)}'`)
     const existente = existentes.value?.[0]

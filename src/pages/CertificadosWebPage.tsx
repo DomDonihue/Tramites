@@ -97,6 +97,18 @@ function emptyForm(): FormState {
   }
 }
 
+/*
+Teléfono chileno: 9 dígitos, solo números. Si el vecino pega el número con
+prefijo +56, se quita el prefijo.
+*/
+function soloDigitosTelefono(value: string) {
+  const digitos = value.replace(/\D/g, '')
+  return (digitos.length > 9 && digitos.startsWith('56')
+    ? digitos.slice(2)
+    : digitos
+  ).slice(0, 9)
+}
+
 function formatRut(value: string) {
   const raw = value
     .replace(/[^0-9kK]/g, '')
@@ -1436,6 +1448,9 @@ function ApplicantStep({
     }))
   }
 
+  const [errorTelefono, setErrorTelefono] =
+    useState('')
+
   return (
     <div>
 
@@ -1493,12 +1508,20 @@ function ApplicantStep({
             onChange={e =>
               set(
                 'telefono',
-                e.target.value
+                soloDigitosTelefono(
+                  e.target.value
+                )
               )
             }
-            placeholder="+56 9 1234 5678"
+            inputMode="numeric"
+            maxLength={9}
+            placeholder="912345678"
             className="mt-2 w-full border rounded-xl px-3 py-2.5 font-normal"
           />
+
+          <span className="block mt-1 text-xs font-normal text-slate-500">
+            9 dígitos, solo números
+          </span>
 
         </label>
 
@@ -1524,6 +1547,12 @@ function ApplicantStep({
 
       </div>
 
+      {errorTelefono && (
+        <p className="mt-4 text-sm text-red-700">
+          {errorTelefono}
+        </p>
+      )}
+
       <NavButtons
         onBack={onBack}
         onNext={() => {
@@ -1535,6 +1564,18 @@ function ApplicantStep({
           ) {
             return
           }
+
+          if (
+            form.telefono &&
+            form.telefono.length !== 9
+          ) {
+            setErrorTelefono(
+              'El teléfono debe tener 9 dígitos.'
+            )
+            return
+          }
+
+          setErrorTelefono('')
 
           onNext()
         }}
