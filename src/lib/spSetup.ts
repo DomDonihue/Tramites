@@ -115,7 +115,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'Fecha',            type: 'dateTime' },
   { name: 'Solicitante',      type: 'text' },
   { name: 'RutSolicitante',   type: 'text' },
-  { name: 'EmailSol',         type: 'text' },
+  { name: 'Email',            type: 'text' },
   { name: 'Telefono',         type: 'text' },
   { name: 'TipoCertificado',  type: 'choice', choices: [
     'NUMERO','RURALIDAD','URBANIZACION','AFECTACION_UTILIDAD_PUBLICA',
@@ -133,7 +133,7 @@ const COLS_CERTIFICADOS: ColDef[] = [
   { name: 'UrbanoRural',      type: 'choice', choices: ['URBANO','RURAL'] },
   { name: 'NumeroAsignado',   type: 'text' },
   { name: 'FechaEntrega',     type: 'dateTime' },
-  { name: 'EstadoCert',       type: 'choice', choices: ['POR_ENTREGAR','ENTREGADO'] },
+  { name: 'Estado',           type: 'choice', choices: ['POR_ENTREGAR','ENTREGADO'] },
   { name: 'EstadoPago',       type: 'text' },
   { name: 'TotalDerechos',    type: 'number' },
   { name: 'GiroMunicipal',    type: 'text' },

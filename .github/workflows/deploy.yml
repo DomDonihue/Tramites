@@ -25,6 +25,10 @@ jobs:
       - run: npm ci
 
       - run: npm run build
+        env:
+          VITE_CERTIFICADOS_WEB_SUBMIT_URL: ${{ secrets.VITE_CERTIFICADOS_WEB_SUBMIT_URL }}
+          VITE_CERTIFICADOS_WEB_QUERY_URL: ${{ secrets.VITE_CERTIFICADOS_WEB_QUERY_URL }}
+          VITE_CERTIFICADOS_WEB_CATALOGO_URL: ${{ secrets.VITE_CERTIFICADOS_WEB_CATALOGO_URL }}
 
       - uses: peaceiris/actions-gh-pages@v4
         with:

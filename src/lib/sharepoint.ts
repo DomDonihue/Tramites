@@ -46,18 +46,28 @@ export async function spUpdateCertificado(spId:string,c:Partial<Certificado>):Pr
 export async function spDeleteCertificado(spId:string):Promise<void>{await spDelete(listItem('Certificados',spId))}
 export async function spBorrarTodosCertificados(onProgress?:(done:number,total:number)=>void):Promise<{borrados:number;total:number}>{let borrados=0,total=0;for(;;){const data=await spFetch(`${listItems('Certificados')}?$select=Id&$top=1000`);const items:{Id:number}[]=data?.value??[];if(!items.length)break;total+=items.length;for(const it of items){await spDelete(listItem('Certificados',String(it.Id)));borrados++;onProgress?.(borrados,total)}}return{borrados,total}}
 
+// ── NOMBRES DE COLUMNAS ──
+// CertificadosWeb y CatalogoCertificadosWeb se importaron desde Excel: sus columnas se llaman
+// field_1, field_2… por dentro. Se trabaja con el nombre visible y aquí se traduce al interno.
+type CampoSP={interno:string;visible:string;tipo:string}
+const camposCache=new Map<string,Promise<CampoSP[]>>()
+function camposLista(list:string):Promise<CampoSP[]>{let p=camposCache.get(list);if(!p){p=spFetch(`/web/lists/getbytitle('${list}')/fields?$select=Title,InternalName,TypeAsString&$filter=Hidden eq false and ReadOnlyField eq false`).then((d:any)=>(d.value??[]).map((f:any)=>({interno:f.InternalName,visible:String(f.Title).trim(),tipo:f.TypeAsString})));camposCache.set(list,p);p.catch(()=>camposCache.delete(list))}return p}
+async function aVisible(list:string,item:Record<string,any>):Promise<Record<string,any>>{const campos=await camposLista(list);const out:Record<string,any>={};for(const[k,v]of Object.entries(item))out[campos.find(c=>c.interno===k)?.visible??k]=v;return out}
+async function aInterno(list:string,values:Record<string,unknown>):Promise<Record<string,unknown>>{const campos=await camposLista(list);const out:Record<string,unknown>={};for(const[k,v]of Object.entries(values)){const c=campos.find(c=>c.visible.toLowerCase()===k.toLowerCase())??campos.find(c=>c.interno===k);if(!c)continue;out[c.interno]=c.tipo==='Boolean'?v===true||v==='Sí':c.tipo==='Number'||c.tipo==='Currency'?(v===null||v===''?null:Number(v)):typeof v==='boolean'?(v?'Sí':'No'):typeof v==='number'?String(v):v}return out}
+const esSi=(v:unknown)=>v===true||['sí','si','true','1'].includes(String(v??'').trim().toLowerCase())
+
 // ── CERTIFICADOS WEB ──
-export async function spGetCertificadosWeb():Promise<Record<string,any>[]>{const data=await spFetch(`${listItems('CertificadosWeb')}?$top=5000&$orderby=Id desc`);return(data.value??[]) as Record<string,any>[]}
-export async function spGetCertificadoWeb(spId:string):Promise<Record<string,any>>{return await spFetch(listItem('CertificadosWeb',spId)) as Record<string,any>}
-export async function spUpdateCertificadoWeb(spId:string,values:Record<string,unknown>):Promise<void>{await spFetch(listItem('CertificadosWeb',spId),'PATCH',values)}
+export async function spGetCertificadosWeb():Promise<Record<string,any>[]>{const data=await spFetch(`${listItems('CertificadosWeb')}?$top=5000&$orderby=Id desc`);return Promise.all((data.value??[]).map((i:any)=>aVisible('CertificadosWeb',i)))}
+export async function spGetCertificadoWeb(spId:string):Promise<Record<string,any>>{return aVisible('CertificadosWeb',await spFetch(listItem('CertificadosWeb',spId)))}
+export async function spUpdateCertificadoWeb(spId:string,values:Record<string,unknown>):Promise<void>{await spFetch(listItem('CertificadosWeb',spId),'PATCH',await aInterno('CertificadosWeb',values))}
 
 // ── CATÁLOGO CERTIFICADOS WEB ──
 export interface CatalogoCertificadoSP { id:string; title:string; codigo:string; descripcion:string; valor:number; plazoDias:number; documentosRequeridos:string; activo:boolean; orden:number; destacado:boolean }
 function catalogoToSP(c:Partial<CatalogoCertificadoSP>):Record<string,unknown>{return{Title:c.title??'',Codigo:c.codigo??'',Descripcion:c.descripcion??null,Valor:c.valor??0,PlazoDias:c.plazoDias??0,DocumentosRequeridos:c.documentosRequeridos??null,Activo:c.activo!==false,Orden:c.orden??999,Destacado:c.destacado===true}}
-function spToCatalogo(f:Record<string,unknown>):CatalogoCertificadoSP{return{id:String(f.Id??''),title:String(f.Title??''),codigo:String(f.Codigo??''),descripcion:String(f.Descripcion??''),valor:Number(f.Valor??0),plazoDias:Number(f.PlazoDias??0),documentosRequeridos:String(f.DocumentosRequeridos??''),activo:f.Activo!==false,orden:Number(f.Orden??999),destacado:f.Destacado===true||String(f.Destacado).toLowerCase()==='sí'||String(f.Destacado).toLowerCase()==='si'}}
-export async function spGetCatalogoCertificadosWeb():Promise<CatalogoCertificadoSP[]>{const data=await spFetch(`${listItems('CatalogoCertificadosWeb')}?$top=5000&$orderby=Id asc`);return(data.value??[]).map((item:any)=>spToCatalogo(item)).sort((a:CatalogoCertificadoSP,b:CatalogoCertificadoSP)=>a.orden-b.orden||a.id.localeCompare(b.id))}
-export async function spCreateCatalogoCertificado(c:Partial<CatalogoCertificadoSP>):Promise<string>{const data=await spFetch(listItems('CatalogoCertificadosWeb'),'POST',catalogoToSP(c));return String(data.Id)}
-export async function spUpdateCatalogoCertificado(spId:string,c:Partial<CatalogoCertificadoSP>):Promise<void>{await spFetch(listItem('CatalogoCertificadosWeb',spId),'PATCH',catalogoToSP(c))}
+function spToCatalogo(f:Record<string,unknown>):CatalogoCertificadoSP{return{id:String(f.Id??''),title:String(f.Title??''),codigo:String(f.Codigo??''),descripcion:String(f.Descripcion??''),valor:Number(f.Valor??0),plazoDias:Number(f.PlazoDias??0),documentosRequeridos:String(f.DocumentosRequeridos??''),activo:f.Activo===undefined||f.Activo===null||esSi(f.Activo),orden:Number(f.Orden??999)||999,destacado:esSi(f.Destacado)}}
+export async function spGetCatalogoCertificadosWeb():Promise<CatalogoCertificadoSP[]>{const data=await spFetch(`${listItems('CatalogoCertificadosWeb')}?$top=5000&$orderby=Id asc`);const filas=await Promise.all((data.value??[]).map((i:any)=>aVisible('CatalogoCertificadosWeb',i)));return filas.map(spToCatalogo).sort((a:CatalogoCertificadoSP,b:CatalogoCertificadoSP)=>a.orden-b.orden||a.id.localeCompare(b.id))}
+export async function spCreateCatalogoCertificado(c:Partial<CatalogoCertificadoSP>):Promise<string>{const data=await spFetch(listItems('CatalogoCertificadosWeb'),'POST',await aInterno('CatalogoCertificadosWeb',catalogoToSP(c)));return String(data.Id)}
+export async function spUpdateCatalogoCertificado(spId:string,c:Partial<CatalogoCertificadoSP>):Promise<void>{await spFetch(listItem('CatalogoCertificadosWeb',spId),'PATCH',await aInterno('CatalogoCertificadosWeb',catalogoToSP(c)))}
 export async function spDeleteCatalogoCertificado(spId:string):Promise<void>{await spDelete(listItem('CatalogoCertificadosWeb',spId))}
 
 // ── DESARCHIVOS ──

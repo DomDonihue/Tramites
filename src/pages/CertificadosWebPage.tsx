@@ -587,8 +587,10 @@ export function CertificadosWebPage() {
         )
 
       if (!response.ok) {
+        const detalle = await response.json().catch(() => null)
         throw new Error(
-          'No fue posible registrar la solicitud.'
+          detalle?.error ??
+            'No fue posible registrar la solicitud.'
         )
       }
 
@@ -671,8 +673,10 @@ export function CertificadosWebPage() {
         )
 
       if (!response.ok) {
+        const detalle = await response.json().catch(() => null)
         throw new Error(
-          'No encontramos una solicitud con esos datos.'
+          detalle?.error ??
+            'No encontramos una solicitud con esos datos.'
         )
       }
 
@@ -2159,6 +2163,7 @@ function StatusCard({
 }) {
   const estado =
     data.estado ??
+    data.EstadoSolicitud ??
     data.Estado ??
     'En revisión'
 

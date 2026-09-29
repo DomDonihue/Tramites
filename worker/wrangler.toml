@@ -1,0 +1,23 @@
+name = "portal-dom-donihue"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+preview_urls = false
+
+[vars]
+SITE_PATH = "mdonihue.sharepoint.com:/sites/DOMExpediente"
+ALLOWED_ORIGINS = "https://domdonihue.github.io,http://localhost:5173"
+# TENANT_ID, CLIENT_ID y CLIENT_SECRET se cargan como secretos:
+#   npx wrangler secret put TENANT_ID
+#   npx wrangler secret put CLIENT_ID
+#   npx wrangler secret put CLIENT_SECRET
+#   npx wrangler secret put ADMIN_KEY   (clave para /admin/conectar)
+
+# Sesión delegada (refresh token de la cuenta municipal conectada en /admin/conectar)
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "d8f2cdcbc2f043c4b124eea82178c5f1"
+
+# Renueva la sesión a diario para que no venza por inactividad (90 días)
+[triggers]
+crons = ["0 12 * * *"]
