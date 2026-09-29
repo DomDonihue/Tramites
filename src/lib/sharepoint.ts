@@ -60,6 +60,9 @@ const esSi=(v:unknown)=>v===true||['sí','si','true','1'].includes(String(v??'')
 export async function spGetCertificadosWeb():Promise<Record<string,any>[]>{const data=await spFetch(`${listItems('CertificadosWeb')}?$top=5000&$orderby=Id desc`);return Promise.all((data.value??[]).map((i:any)=>aVisible('CertificadosWeb',i)))}
 export async function spGetCertificadoWeb(spId:string):Promise<Record<string,any>>{return aVisible('CertificadosWeb',await spFetch(listItem('CertificadosWeb',spId)))}
 export async function spUpdateCertificadoWeb(spId:string,values:Record<string,unknown>):Promise<void>{await spFetch(listItem('CertificadosWeb',spId),'PATCH',await aInterno('CertificadosWeb',values))}
+// Adjuntos que el portal guarda en la biblioteca Documentos, carpeta CertificadosWeb/<folio>
+export interface AdjuntoWeb{nombre:string;url:string;tamano:number}
+export async function spGetAdjuntosCertificadoWeb(folio:string):Promise<AdjuntoWeb[]>{const raiz=await spFetch(`/web/lists/getbytitle('Documentos')/RootFolder?$select=ServerRelativeUrl`);const ruta=`${raiz.ServerRelativeUrl}/CertificadosWeb/${folio}`.replace(/'/g,"''");const data=await spFetch(`/web/GetFolderByServerRelativePath(decodedurl='${encodeURIComponent(ruta)}')/Files?$select=Name,ServerRelativeUrl,Length`).catch(()=>null);return(data?.value??[]).map((f:any)=>({nombre:f.Name,url:`${new URL(SITE_URL).origin}${f.ServerRelativeUrl}`,tamano:Number(f.Length??0)}))}
 
 // ── CATÁLOGO CERTIFICADOS WEB ──
 export interface CatalogoCertificadoSP { id:string; title:string; codigo:string; descripcion:string; valor:number; plazoDias:number; documentosRequeridos:string; activo:boolean; orden:number; destacado:boolean }

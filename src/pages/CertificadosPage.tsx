@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { FilePlus, Printer, Search, X, Check, ChevronDown, ChevronUp, Trash2, Eye, AlertTriangle, Edit2, UserCheck, SlidersHorizontal } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
@@ -15,6 +15,7 @@ import { diasHabilesTranscurridos, nivelSemaforoCert, fechaEntregaEstimada, hoyI
 import { formatRut, validarRut, rutIncompleto } from '../lib/rut'
 import { separarDireccion } from '../lib/direccion'
 import { getConfig } from '../lib/config'
+import { spUpdateCertificadoWeb } from '../lib/sharepoint'
 
 function SemaforoCert({ fecha, estado }: { fecha: string; estado: EstadoCertificado }) {
   if (estado === 'ENTREGADO') return null
@@ -57,6 +58,18 @@ function emptyForm(): Omit<Certificado,'id'|'numero'|'created_at'|'updated_at'> 
   }
 }
 
+// El portal guarda los códigos del catálogo separados por coma ("NUMERO, CIP").
+// CIP es el código del catálogo para Informaciones Previas; también se aceptan nombres.
+function tiposDesdeWeb(valor: string): TipoCertificado[] {
+  return valor.split(',').map(v => v.trim()).filter(Boolean).map(v => {
+    const codigo = v.toUpperCase()
+    if (codigo === 'CIP') return 'INFORMACIONES_PREVIAS'
+    if (TIPOS.includes(codigo as TipoCertificado)) return codigo as TipoCertificado
+    const porNombre = TIPOS.find(t => TIPO_CERT_LABELS[t].toLowerCase() === v.toLowerCase())
+    return porNombre ?? 'OTROS'
+  })
+}
+
 function fmtDate(s?: string) {
   if (!s) return '—'
   const [y,m,d] = s.slice(0,10).split('-')
@@ -66,7 +79,10 @@ function fmtDate(s?: string) {
 export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
   const { can, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const { toasts, addToast, removeToast } = useToast()
+  // Solicitud del portal ciudadano que se está convirtiendo en certificado (viene desde la bandeja web)
+  const solicitudWeb = (location.state as { solicitudWeb?: Record<string, any> } | null)?.solicitudWeb ?? null
 
   const [view, setView] = useState<'lista'|'form'|'print'>(nuevo ? 'form' : 'lista')
   const [tab, setTab]   = useState<'certificados'|'previos'>('certificados')
@@ -223,10 +239,34 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
   // La ruta manda: /certificados/nuevo abre el formulario en blanco,
   // /certificados vuelve al listado.
   useEffect(() => {
-    if (nuevo) { limpiarForm(); setView('form') }
+    if (nuevo) { limpiarForm(); if (solicitudWeb) cargarSolicitudWeb(solicitudWeb); setView('form') }
     else setView('lista')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nuevo])
+  }, [nuevo, solicitudWeb])
+
+  // Precarga los datos de la solicitud web. Luego se busca el ROL en el registro:
+  // si existe, los datos de la propiedad se completan desde ahí (autoFillRol).
+  const cargarSolicitudWeb = (s: Record<string, any>) => {
+    const tipos = tiposDesdeWeb(String(s.TipoCertificado ?? ''))
+    const folio = String(s.FolioSolicitud || s.Title || '')
+    setForm(f => ({
+      ...f,
+      solicitante:      String(s.Solicitante ?? ''),
+      rut_solicitante:  formatRut(String(s.RutSolicitante ?? '')),
+      email:            String(s.Email ?? ''),
+      telefono:         String(s.Telefono ?? ''),
+      tipo:             tipos[0] ?? 'NUMERO',
+      otros_descripcion: String(s.OtrosDescripcion ?? ''),
+      propietario:      String(s.Propietario ?? ''),
+      direccion:        String(s.Direccion ?? ''),
+      numero_domicilio: s.NumeroDomicilio ? String(s.NumeroDomicilio) : '',
+      localidad:        String(s.Localidad ?? ''),
+      urbano_rural:     s.UrbanoRural === 'RURAL' ? 'RURAL' : 'URBANO',
+      total_derechos:   tipos.length === 1 && s.TotalDerechos ? Number(s.TotalDerechos) : f.total_derechos,
+      anotaciones:      folio ? `Solicitud web ${folio}` : f.anotaciones,
+    }))
+    if (s.RolAvaluo) autoFillRol(String(s.RolAvaluo))
+  }
 
   /** Cierra el formulario: si vinimos por la ruta "nuevo", vuelve al listado. */
   const salirDelForm = () => {
@@ -256,6 +296,14 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
       addToast('Certificado registrado.', 'success')
     }
     refresh()
+    // Certificado creado desde una solicitud web: la solicitud pasa a elaboración y se vuelve a la bandeja
+    if (solicitudWeb && !editTarget) {
+      spUpdateCertificadoWeb(String(solicitudWeb.Id), { EstadoSolicitud: 'EN_ELABORACION' })
+        .catch(e => addToast(`El certificado se guardó, pero no se pudo actualizar la solicitud web: ${e?.message ?? e}`, 'error'))
+      limpiarForm()
+      navigate('/certificados-web/bandeja')
+      return
+    }
     salirDelForm()
   }
 
@@ -324,6 +372,22 @@ export function CertificadosPage({ nuevo = false }: { nuevo?: boolean } = {}) {
             </p>
           </div>
         </div>
+
+        {solicitudWeb && !editTarget && (() => {
+          const tipos = tiposDesdeWeb(String(solicitudWeb.TipoCertificado ?? ''))
+          return (
+            <div className="mb-4 p-4 rounded-2xl border border-blue-200 bg-blue-50 text-sm text-blue-900">
+              <p className="font-semibold">Datos cargados desde la solicitud web {solicitudWeb.FolioSolicitud || solicitudWeb.Title}</p>
+              <p className="mt-1">Revisa y corrige lo que sea necesario antes de guardar. Al guardar, la solicitud pasa a <b>EN_ELABORACION</b>.</p>
+              {tipos.length > 1 && (
+                <p className="mt-1">
+                  El vecino pidió {tipos.length} certificados ({tipos.map(t => TIPO_CERT_LABELS[t]).join(', ')}).
+                  Se cargó el primero; crea los demás desde la bandeja con el botón "Crear certificado".
+                </p>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="space-y-4">
           {/* Tipo */}
