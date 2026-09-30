@@ -3,9 +3,7 @@ import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { initFromSharePoint } from './lib/data'
 import { AppLayout } from './components/layout/AppLayout'
-import { CitizenNavigation } from './components/CitizenNavigation'
 import { LoginPage } from './pages/LoginPage'
-import { PortalCiudadanoPage } from './pages/PortalCiudadanoPage'
 import { BuscarPage } from './pages/BuscarPage'
 import { ExpedienteFormPage } from './pages/ExpedienteFormPage'
 import { EstadisticasPage } from './pages/EstadisticasPage'
@@ -13,9 +11,6 @@ import { RepositorioPage } from './pages/RepositorioPage'
 import { UsuariosPage } from './pages/UsuariosPage'
 import { DesarchivePage } from './pages/DesarchivePage'
 import { CertificadosPage } from './pages/CertificadosPage'
-import { CertificadosWebPage } from './pages/CertificadosWebPage'
-import { CertificadosWebBandejaPage } from './pages/CertificadosWebBandejaPage'
-import { PortalCiudadanoAdminPage } from './pages/PortalCiudadanoAdminPage'
 import { SetupPage } from './pages/SetupPage'
 import { ImportPage } from './pages/ImportPage'
 
@@ -31,8 +26,6 @@ function ProtectedRoutes() {
     <Route path="/desarchivo/:id" element={<DesarchivePage />} />
     <Route path="/certificados" element={<CertificadosPage />} />
     <Route path="/certificados/nuevo" element={<CertificadosPage nuevo />} />
-    <Route path="/certificados-web/bandeja" element={<CertificadosWebBandejaPage />} />
-    {can('manageUsers') && <Route path="/portal-admin/certificados" element={<PortalCiudadanoAdminPage />} />}
     {can('manageUsers') && <Route path="/setup" element={<SetupPage />} />}
     {can('manageUsers') && <Route path="/importar" element={<ImportPage />} />}
     {can('manageUsers') && <Route path="/usuarios" element={<UsuariosPage />} />}
@@ -40,16 +33,13 @@ function ProtectedRoutes() {
   </Routes></AppLayout>
 }
 
-function CitizenRoute() { return <CitizenNavigation><CertificadosWebPage /></CitizenNavigation> }
-
 function AuthGate() {
   const { user } = useAuth()
   useEffect(() => { if (user) initFromSharePoint() }, [user])
   return <Routes>
-    <Route path="/" element={<PortalCiudadanoPage />} />
-    <Route path="/profesionales" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
-    <Route path="/certificados-web" element={<CitizenRoute />} />
-    <Route path="/consultar-solicitud" element={<CitizenRoute />} />
+    {/* Uso interno de la DOM: la raíz es el inicio de sesión */}
+    <Route path="/" element={user ? <Navigate to="/buscar" replace /> : <LoginPage />} />
+    <Route path="/profesionales" element={<Navigate to="/" replace />} />
     <Route path="/*" element={<ProtectedRoutes />} />
   </Routes>
 }
