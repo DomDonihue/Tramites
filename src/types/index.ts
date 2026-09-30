@@ -146,6 +146,8 @@ export interface Desarchivo {
   rut_solicitante?: string
   documentos: DocDesarchivo[]
   documentos_retirados?: DocDesarchivo[]
+  // Copias entregadas desde el repositorio digital (nombres de archivo), sin ir a bodega
+  documentos_digitales?: string[]
   fecha: string
   funcionario?: string
   created_at: string

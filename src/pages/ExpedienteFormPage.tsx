@@ -3,12 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Save, ArrowLeft, Upload, X, FileText, CheckCircle, Loader2, AlertCircle, Plus } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
-import { Expediente, Categoria, Etapa, TIPOS_POR_CATEGORIA, CATEGORIA_LABELS, ETAPA_LABELS, ESTADO_CONFIG, Documento } from '../types'
+import { Expediente, Categoria, Etapa, TIPOS_POR_CATEGORIA, CATEGORIA_LABELS, ETAPA_LABELS, ESTADO_CONFIG } from '../types'
 import { useToast } from '../hooks/useToast'
 import { ToastContainer } from '../components/ui/Toast'
-import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { generarRutaRepositorio } from '../lib/repositorio'
-import { spUploadArchivo } from '../lib/sharepoint'
+import { ArchivoRepositorio, spListarArchivosRepositorio, spMoverCarpetaRepositorio, spSubirArchivoRepositorio } from '../lib/sharepoint'
 import { getChecklist, ItemChecklist } from '../lib/checklistDocs'
 
 interface ArchivoEnCola {
@@ -47,11 +46,13 @@ export function ExpedienteFormPage() {
   const { toasts, addToast, removeToast } = useToast()
 
   const [form, setForm]               = useState({ ...EMPTY })
-  const [docs, setDocs]               = useState<Documento[]>([])
+  // Documentos ya guardados en la carpeta del expediente en SharePoint
+  const [docs, setDocs]               = useState<ArchivoRepositorio[]>([])
+  const [cargandoDocs, setCargandoDocs] = useState(false)
+  const [rutaOriginal, setRutaOriginal] = useState<string | null>(null)
   const [cola, setCola]               = useState<ArchivoEnCola[]>([])
   const [dragOver, setDragOver]       = useState(false)
   const [saving, setSaving]           = useState(false)
-  const [deleteDocTarget, setDeleteDocTarget] = useState<Documento | null>(null)
 
   useEffect(() => {
     if (isEdit && id) {
@@ -59,7 +60,13 @@ export function ExpedienteFormPage() {
       if (exp) {
         const { id: _id, created_at, updated_at, documentos, ...rest } = exp
         setForm(rest)
-        setDocs(documentos || [])
+        const ruta = generarRutaRepositorio(exp)
+        setRutaOriginal(ruta)
+        setCargandoDocs(true)
+        spListarArchivosRepositorio(ruta)
+          .then(setDocs)
+          .catch(() => addToast('No se pudieron leer los documentos del expediente.', 'error'))
+          .finally(() => setCargandoDocs(false))
       }
     }
   }, [id, isEdit])
@@ -118,30 +125,38 @@ export function ExpedienteFormPage() {
         expedienteId = nuevo.id
       }
 
-      // Subir archivos en cola a SharePoint
-      if (cola.length > 0 && expedienteId) {
-        const expCompleto = db.getExpediente(expedienteId)!
-        const ruta = generarRutaRepositorio(expCompleto)
+      const expCompleto = expedienteId ? db.getExpediente(expedienteId) : undefined
+      const ruta = expCompleto ? generarRutaRepositorio(expCompleto) : null
 
+      // Si cambiaron los datos que forman la carpeta, los documentos ya guardados se mueven con ella
+      if (ruta && rutaOriginal && rutaOriginal !== ruta) {
+        try { await spMoverCarpetaRepositorio(rutaOriginal, ruta); setRutaOriginal(ruta) }
+        catch { addToast('No se pudo mover la carpeta de documentos a la nueva ubicación.', 'error') }
+      }
+
+      // Subir archivos en cola a la carpeta del expediente
+      let errores = 0
+      if (cola.length > 0 && ruta) {
         for (let i = 0; i < cola.length; i++) {
           const archivo = cola[i]
+          if (archivo.estado === 'ok') continue
           setCola(prev => prev.map((a, idx) => idx === i ? { ...a, estado: 'subiendo' } : a))
           try {
-            const url = await spUploadArchivo(archivo.file, ruta)
-            const doc = db.addDocumento(expedienteId!, {
-              expediente_id: expedienteId!,
-              nombre:        archivo.file.name,
-              tipo_doc:      archivo.tipo_doc as any,
-              url,
-            })
-            setDocs(prev => [...prev, doc])
-            setCola(prev => prev.map((a, idx) => idx === i ? { ...a, estado: 'ok', url } : a))
+            const subido = await spSubirArchivoRepositorio(archivo.file, ruta, archivo.itemId)
+            setDocs(prev => [...prev, subido])
+            setCola(prev => prev.map((a, idx) => idx === i ? { ...a, estado: 'ok', url: subido.url } : a))
           } catch {
+            errores++
             setCola(prev => prev.map((a, idx) => idx === i ? { ...a, estado: 'error' } : a))
           }
         }
       }
 
+      if (errores) {
+        // No se sale del formulario: el funcionario ve qué archivos fallaron y puede reintentar
+        addToast(`El expediente se guardó, pero ${errores} archivo(s) no se pudieron subir. Presiona guardar para reintentar.`, 'error')
+        return
+      }
       addToast(isEdit ? 'Expediente actualizado.' : 'Expediente registrado.', 'success')
       setTimeout(() => navigate('/buscar'), 1500)
     } catch (err) {
@@ -149,14 +164,6 @@ export function ExpedienteFormPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleDeleteDoc = () => {
-    if (!deleteDocTarget || !id) return
-    db.deleteDocumento(id, deleteDocTarget.id)
-    setDocs(prev => prev.filter(d => d.id !== deleteDocTarget.id))
-    setDeleteDocTarget(null)
-    addToast('Documento eliminado.', 'success')
   }
 
   const tipos = TIPOS_POR_CATEGORIA[form.categoria as Categoria] || []
@@ -174,13 +181,6 @@ export function ExpedienteFormPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-      <ConfirmDialog
-        open={!!deleteDocTarget}
-        title="Eliminar documento"
-        message={`¿Eliminar "${deleteDocTarget?.nombre}"?`}
-        onConfirm={handleDeleteDoc}
-        onCancel={() => setDeleteDocTarget(null)}
-      />
 
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl text-gray-500">
@@ -307,6 +307,8 @@ export function ExpedienteFormPage() {
         {(() => {
           const checklist: ItemChecklist[] = getChecklist(form.categoria, form.etapa)
           const extras = cola.filter(a => a.itemId === 'extra')
+          // Guardados que no corresponden a un ítem del checklist actual (adicionales o de otra etapa)
+          const otrosGuardados = docs.filter(d => !checklist.some(item => item.id === d.item))
 
           return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -318,7 +320,8 @@ export function ExpedienteFormPage() {
               <div className="space-y-3">
                 {checklist.map(item => {
                   const enCola  = cola.find(a => a.itemId === item.id)
-                  const guardado = docs.find(d => d.tipo_doc === item.tipo_doc && !cola.find(a => a.itemId === item.id && a.estado === 'ok'))
+                  // El más reciente de ese ítem (si se reemplazó, el anterior queda guardado como historial)
+                  const guardado = [...docs].reverse().find(d => d.item === item.id)
 
                   return (
                     <div key={item.id} className={`rounded-xl border px-4 py-3 flex items-center gap-3 transition-colors ${
@@ -356,7 +359,7 @@ export function ExpedienteFormPage() {
 
                       {/* Acciones */}
                       <div className="shrink-0 flex items-center gap-2">
-                        {guardado && !enCola && guardado.url && guardado.url !== '#' && (
+                        {guardado && !enCola && (
                           <a href={guardado.url} target="_blank" rel="noreferrer"
                             className="text-xs text-dom-navy hover:underline px-2 py-1 rounded-lg hover:bg-white">
                             Ver
@@ -370,7 +373,7 @@ export function ExpedienteFormPage() {
                         )}
                         {!enCola && (
                           <label className="cursor-pointer inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-600">
-                            <Upload size={12} /> Adjuntar
+                            <Upload size={12} /> {guardado ? 'Reemplazar' : 'Adjuntar'}
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.dwg,.doc,.docx" className="hidden"
                               onChange={e => adjuntarAItem(item, e.target.files)} />
                           </label>
@@ -379,6 +382,19 @@ export function ExpedienteFormPage() {
                     </div>
                   )
                 })}
+
+                {/* Documentos ya guardados fuera del checklist */}
+                {otrosGuardados.map(doc => (
+                  <div key={doc.rutaServidor} className="rounded-xl border px-4 py-3 flex items-center gap-3 bg-green-50 border-green-200">
+                    <CheckCircle size={18} className="text-green-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{doc.nombre}</p>
+                      <p className="text-xs text-green-600">Documento adicional guardado</p>
+                    </div>
+                    <a href={doc.url} target="_blank" rel="noreferrer"
+                      className="text-xs text-dom-navy hover:underline px-2 py-1 rounded-lg hover:bg-white">Ver</a>
+                  </div>
+                ))}
 
                 {/* Documentos adicionales */}
                 {extras.map((archivo, i) => (
@@ -402,7 +418,9 @@ export function ExpedienteFormPage() {
               </div>
 
               <p className="text-xs text-gray-400 mt-4">
-                Los archivos se subirán a SharePoint automáticamente al guardar el expediente.
+                {cargandoDocs
+                  ? 'Buscando documentos guardados…'
+                  : 'Los archivos se suben a la carpeta del expediente en SharePoint al guardar.'}
               </p>
             </div>
           )

@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, Save, CheckSquare, Square, History,
-  AlertCircle, FileText, MapPin, ScrollText, Zap, Pencil, Check, X
+  AlertCircle, FileText, MapPin, ScrollText, Zap, Pencil, Check, X, HardDrive, ExternalLink
 } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import { DocDesarchivo, DOC_DESARCHIVO_LABELS, Desarchivo } from '../types'
 import { useToast } from '../hooks/useToast'
 import { ToastContainer } from '../components/ui/Toast'
+import { generarRutaRepositorio } from '../lib/repositorio'
+import { ArchivoRepositorio, spListarArchivosRepositorio } from '../lib/sharepoint'
 
 const DOCS: DocDesarchivo[] = ['plano', 'permiso_edificacion', 'recepcion', 'eet']
 
@@ -49,12 +51,23 @@ export function DesarchivePage() {
   const [rut, setRut] = useState('')
   const [fecha, setFecha] = useState(today())
   const [docsRetiro, setDocsRetiro] = useState<Set<DocDesarchivo>>(new Set())
+  // Copia digital del expediente en el repositorio (null mientras carga)
+  const [digitales, setDigitales] = useState<ArchivoRepositorio[] | null>(null)
+  const [digitalesEntrega, setDigitalesEntrega] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState<Desarchivo | null>(null)
 
   const [_refresh, setRefresh] = useState(0)
   const forceRefresh = () => setRefresh(n => n + 1)
 
   const historial = id ? db.getDesarchivos(id) : []
+
+  useEffect(() => {
+    if (!expediente) return
+    spListarArchivosRepositorio(generarRutaRepositorio(expediente))
+      .then(setDigitales)
+      .catch(() => setDigitales([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expediente?.id])
 
   if (!expediente) {
     return (
@@ -101,14 +114,23 @@ export function DesarchivePage() {
     })
   }
 
+  const toggleDigital = (ruta: string) => {
+    setDigitalesEntrega(prev => {
+      const next = new Set(prev)
+      next.has(ruta) ? next.delete(ruta) : next.add(ruta)
+      return next
+    })
+  }
+
   const handleGuardar = () => {
     if (!solicitante.trim()) { addToast('Ingresa el nombre del solicitante.', 'error'); return }
-    if (docsRetiro.size === 0) { addToast('Selecciona al menos un documento a retirar.', 'error'); return }
+    if (docsRetiro.size === 0 && digitalesEntrega.size === 0) { addToast('Selecciona al menos un documento a entregar.', 'error'); return }
     const nuevo = db.createDesarchivo({
       expediente_id: expediente.id,
       solicitante: solicitante.trim(),
       rut_solicitante: rut.trim() || undefined,
       documentos: Array.from(docsRetiro),
+      documentos_digitales: (digitales ?? []).filter(d => digitalesEntrega.has(d.rutaServidor)).map(d => d.nombre),
       fecha,
       funcionario: user?.nombre,
     })
@@ -117,7 +139,7 @@ export function DesarchivePage() {
   }
 
   const resetForm = () => {
-    setSaved(null); setDocsRetiro(new Set()); setSolicitante(''); setRut(''); setFecha(today())
+    setSaved(null); setDocsRetiro(new Set()); setDigitalesEntrega(new Set()); setSolicitante(''); setRut(''); setFecha(today())
   }
 
   return (
@@ -131,7 +153,7 @@ export function DesarchivePage() {
         </button>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Desarchivo</h1>
-          <p className="text-sm text-gray-500">Registro de retiro de documentos del archivo</p>
+          <p className="text-sm text-gray-500">Entrega de documentos desde el repositorio digital o el archivo físico</p>
         </div>
       </div>
 
@@ -173,6 +195,39 @@ export function DesarchivePage() {
               <div className="text-gray-800">{expediente.superficie_m2 ? `${expediente.superficie_m2} m²` : '—'}</div>
             </div>
           </div>
+        </div>
+
+        {/* Copia digital: se entrega sin ir a bodega */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 no-print">
+          <div className="flex items-center gap-2 mb-1">
+            <HardDrive size={14} className="text-dom-navy" />
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Copia digital del expediente</h2>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">Abre o imprime el documento y márcalo para que quede registrado en la entrega.</p>
+          {digitales === null ? (
+            <p className="text-sm text-gray-500">Buscando documentos en el repositorio…</p>
+          ) : digitales.length === 0 ? (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Este expediente no tiene documentos digitalizados. Usa el archivo físico (sección siguiente) o adjúntalos desde "Editar expediente".
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {digitales.map(doc => {
+                const marcado = digitalesEntrega.has(doc.rutaServidor)
+                return (
+                  <div key={doc.rutaServidor} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm ${marcado ? 'bg-dom-navy/5 border-dom-navy' : 'bg-white border-gray-200'}`}>
+                    <button type="button" onClick={() => toggleDigital(doc.rutaServidor)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                      {marcado ? <CheckSquare size={15} className="text-dom-navy shrink-0" /> : <Square size={15} className="text-gray-400 shrink-0" />}
+                      <span className={`truncate ${marcado ? 'font-medium text-dom-navy' : 'text-gray-700'}`}>{doc.nombre}</span>
+                    </button>
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-dom-navy hover:underline shrink-0">
+                      <ExternalLink size={12} /> Ver / imprimir
+                    </a>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Inventario del archivo */}
@@ -267,7 +322,7 @@ export function DesarchivePage() {
         {/* Formulario de retiro / Comprobante */}
         {!saved ? (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 no-print">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Registrar retiro</h2>
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Registrar desarchivo</h2>
 
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
@@ -302,8 +357,13 @@ export function DesarchivePage() {
             </div>
 
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
-              Documentos a retirar <span className="text-red-500">*</span>
+              Documentos físicos a retirar de bodega
             </h3>
+            {digitalesEntrega.size > 0 && (
+              <p className="text-xs text-dom-navy bg-dom-navy/5 border border-dom-navy/20 rounded-lg px-3 py-2 mb-3">
+                Copias digitales a entregar: {digitalesEntrega.size}. Marca aquí solo lo que además se retira físicamente.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               {DOCS.map(doc => {
                 const disponible = enArchivo.has(doc)
@@ -333,14 +393,14 @@ export function DesarchivePage() {
             </div>
 
             {enArchivo.size === 0 && (
-              <p className="text-xs text-amber-600 mt-3">
-                Primero registra qué documentos están en el archivo físico (sección de arriba).
+              <p className="text-xs text-gray-400 mt-3">
+                Sin documentos registrados en el archivo físico.
               </p>
             )}
 
             <button
               onClick={handleGuardar}
-              disabled={enArchivo.size === 0}
+              disabled={docsRetiro.size === 0 && digitalesEntrega.size === 0}
               className="mt-5 flex items-center gap-2 px-5 py-2 bg-dom-navy text-white text-sm font-medium rounded-xl hover:bg-dom-navy-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Save size={15} /> Registrar desarchivo
@@ -372,12 +432,18 @@ export function DesarchivePage() {
             </div>
 
             <div className="mb-4">
-              <span className="text-gray-500 text-xs block mb-2">Documentos retirados</span>
+              <span className="text-gray-500 text-xs block mb-2">Documentos entregados</span>
               <div className="flex flex-wrap gap-2">
                 {saved.documentos.map(doc => (
                   <span key={doc} className="inline-flex items-center gap-1.5 px-3 py-1 bg-dom-navy/10 text-dom-navy text-xs font-medium rounded-lg border border-dom-navy/20">
                     <CheckSquare size={12} />
-                    {DOC_DESARCHIVO_LABELS[doc]}
+                    {DOC_DESARCHIVO_LABELS[doc]} (físico)
+                  </span>
+                ))}
+                {(saved.documentos_digitales ?? []).map(nombre => (
+                  <span key={nombre} className="inline-flex items-center gap-1.5 px-3 py-1 bg-dom-navy/10 text-dom-navy text-xs font-medium rounded-lg border border-dom-navy/20">
+                    <HardDrive size={12} />
+                    {nombre} (copia digital)
                   </span>
                 ))}
               </div>
@@ -415,7 +481,7 @@ export function DesarchivePage() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 no-print">
             <div className="flex items-center gap-2 mb-3">
               <History size={14} className="text-gray-400" />
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Historial de retiros</h2>
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Historial de desarchivos</h2>
             </div>
             <div className="space-y-2">
               {historial.map(h => (
@@ -424,7 +490,7 @@ export function DesarchivePage() {
                     <span className="font-medium text-gray-800">{h.solicitante}</span>
                     {h.rut_solicitante && <span className="text-gray-500 ml-1">({h.rut_solicitante})</span>}
                     <div className="text-gray-500 mt-0.5">
-                      {h.documentos.map(d => DOC_DESARCHIVO_LABELS[d]).join(' · ')}
+                      {[...h.documentos.map(d => DOC_DESARCHIVO_LABELS[d]), ...(h.documentos_digitales ?? []).map(n => `${n} (digital)`)].join(' · ')}
                     </div>
                   </div>
                   <div className="text-gray-400 text-right shrink-0 ml-4">

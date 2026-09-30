@@ -54,7 +54,8 @@ function normalizarRol(rol: string): string {
  */
 export function generarRutaRepositorio(exp: Expediente): string {
   const prefijo  = PREFIJO[exp.categoria] ?? exp.categoria.substring(0, 3)
-  const numExp   = formatNumExp(exp.num_permiso ?? '', exp.ano)
+  // Sin N° de permiso se usa el N° de expediente, para que dos trámites del mismo ROL no compartan carpeta
+  const numExp   = formatNumExp(exp.num_permiso || exp.numero || '', exp.ano)
   const rol      = normalizarRol(exp.rol_avaluo)
   const carpeta  = `_${prefijo}_${numExp}_${rol}`
 
