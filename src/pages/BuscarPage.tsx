@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ChevronDown, ChevronUp, X, ChevronRight, Archive, AlertTriangle } from 'lucide-react'
+import { Search, SlidersHorizontal, FilePlus, Edit2, Trash2, FileText, ChevronDown, ChevronUp, X, ChevronRight, Archive, AlertTriangle, Filter } from 'lucide-react'
 import { db } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import { Expediente, Categoria, Estado, Etapa, CATEGORIA_LABELS, ESTADO_CONFIG, ETAPA_LABELS } from '../types'
@@ -30,6 +30,114 @@ function Semaforo({ fecha, estado }: { fecha?: string; estado: string }) {
   )
 }
 
+const fmtM2Col = (n?: number) => n && n > 0 ? `${n.toLocaleString('es-CL')} m²` : '—'
+const fmtCol = (n?: number) => n ? `$${n.toLocaleString('es-CL')}` : '—'
+
+interface ColDef {
+  key: string
+  label: string
+  get: (e: Expediente) => string
+  sortVal?: (e: Expediente) => number
+}
+
+const COLUMNAS: ColDef[] = [
+  { key: 'fecha', label: 'FECHA', get: e => String(e.fecha ?? e.ano ?? '') },
+  { key: 'numero', label: 'N°', get: e => String(e.numero ?? '') },
+  { key: 'propietario', label: 'PROPIETARIO', get: e => e.propietario ?? '' },
+  { key: 'categoria', label: 'TIPO DE INGRESO', get: e => CATEGORIA_LABELS[e.categoria] ?? e.categoria },
+  { key: 'tipo_tramite', label: 'TIPO DE OBRA', get: e => (e.tipo_tramite ?? '').replace(/_/g, ' ') },
+  { key: 'rol_avaluo', label: 'ROL', get: e => e.rol_avaluo ?? '' },
+  { key: 'profesional', label: 'PROFESIONAL', get: e => e.profesional ?? '' },
+  { key: 'superficie_m2', label: 'SUP', get: e => fmtM2Col(e.superficie_m2), sortVal: e => e.superficie_m2 ?? 0 },
+  { key: 'caja', label: 'CAJA', get: e => String(e.caja ?? '—'), sortVal: e => e.caja ?? 0 },
+  { key: 'total_pesos', label: 'TOTAL $', get: e => fmtCol(e.total_pesos), sortVal: e => e.total_pesos ?? 0 },
+  { key: 'direccion', label: 'DIRECCIÓN', get: e => e.direccion ?? '' },
+  { key: 'estado', label: 'ESTADO', get: e => ESTADO_CONFIG[e.estado]?.label ?? e.estado },
+]
+
+type ColFilters = Record<string, Set<string>>
+
+function ColumnFilterMenu({ options, selected, sortDir, anchor, onApply, onSort, onClose }: {
+  options: string[]
+  selected: Set<string> | undefined
+  sortDir: 'asc' | 'desc' | null
+  anchor: DOMRect
+  onApply: (sel: Set<string> | undefined) => void
+  onSort: (dir: 'asc' | 'desc' | null) => void
+  onClose: () => void
+}) {
+  const [busca, setBusca] = useState('')
+  const [draft, setDraft] = useState<Set<string>>(() => new Set(selected ?? options))
+  const visibles = options.filter(o => o.toLowerCase().includes(busca.toLowerCase()))
+  const todosVisibles = visibles.length > 0 && visibles.every(v => draft.has(v))
+
+  const toggle = (v: string) => setDraft(prev => {
+    const next = new Set(prev)
+    if (next.has(v)) next.delete(v); else next.add(v)
+    return next
+  })
+  const toggleTodos = () => setDraft(prev => {
+    const next = new Set(prev)
+    visibles.forEach(v => { if (todosVisibles) next.delete(v); else next.add(v) })
+    return next
+  })
+  const aplicar = () => {
+    onApply(options.every(o => draft.has(o)) ? undefined : draft)
+    onClose()
+  }
+
+  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - 270))
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed z-50 w-64 bg-white border border-gray-300 rounded-lg shadow-xl text-gray-800 font-normal normal-case text-xs"
+        style={{ top: anchor.bottom + 4, left }}>
+        <div className="p-1 border-b border-gray-200">
+          <button onClick={() => { onSort('asc'); onClose() }}
+            className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 ${sortDir === 'asc' ? 'font-bold text-dom-navy' : ''}`}>
+            Ordenar de A a Z (menor a mayor)
+          </button>
+          <button onClick={() => { onSort('desc'); onClose() }}
+            className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 ${sortDir === 'desc' ? 'font-bold text-dom-navy' : ''}`}>
+            Ordenar de Z a A (mayor a menor)
+          </button>
+          {sortDir && (
+            <button onClick={() => { onSort(null); onClose() }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 text-gray-500">
+              Quitar orden
+            </button>
+          )}
+        </div>
+        <div className="p-2">
+          <input autoFocus value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar…"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-dom-navy/30" />
+        </div>
+        <div className="max-h-56 overflow-y-auto px-2 pb-1">
+          <label className="flex items-center gap-2 px-1 py-1 hover:bg-gray-50 cursor-pointer font-semibold">
+            <input type="checkbox" checked={todosVisibles} onChange={toggleTodos} />
+            (Seleccionar todo)
+          </label>
+          {visibles.map(v => (
+            <label key={v} className="flex items-center gap-2 px-1 py-1 hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" checked={draft.has(v)} onChange={() => toggle(v)} />
+              <span className="truncate">{v === '' ? '(Vacías)' : v}</span>
+            </label>
+          ))}
+          {visibles.length === 0 && <p className="px-1 py-2 text-gray-400">Sin coincidencias</p>}
+        </div>
+        <div className="p-2 border-t border-gray-200 flex justify-between gap-2">
+          <button onClick={() => { onApply(undefined); onClose() }} className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">
+            Borrar filtro
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">Cancelar</button>
+            <button onClick={aplicar} className="px-3 py-1.5 bg-dom-navy text-white rounded hover:bg-dom-navy-dark">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 const TIPO_BUSQUEDA = [
   { value: 'propietario', label: 'Propietario' },
   { value: 'rol_avaluo', label: 'Rol de avalúo' },
@@ -52,8 +160,11 @@ export function BuscarPage() {
   const [filterAno, setFilterAno] = useState<string>('')
   const [deleteTarget, setDeleteTarget] = useState<Expediente | null>(null)
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set())
+  const [colFilters, setColFilters] = useState<ColFilters>({})
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null)
+  const [menu, setMenu] = useState<{ key: string; anchor: DOMRect } | null>(null)
 
-  const results = useMemo(() => {
+  const baseResults = useMemo(() => {
     if (!searched) return []
     let data = db.getExpedientes()
     if (query) {
@@ -69,6 +180,40 @@ export function BuscarPage() {
     if (filterAno) data = data.filter(e => String(e.ano) === filterAno)
     return data
   }, [searched, query, tipoBusqueda, filterCat, filterEtapa, filterEstado, filterAno])
+
+  const filtrarPorColumnas = (data: Expediente[], omitir?: string) =>
+    data.filter(e => COLUMNAS.every(c => {
+      if (c.key === omitir) return true
+      const sel = colFilters[c.key]
+      return !sel || sel.has(c.get(e))
+    }))
+
+  const results = useMemo(() => {
+    const data = filtrarPorColumnas(baseResults)
+    if (!sort) return data
+    const col = COLUMNAS.find(c => c.key === sort.key)
+    if (!col) return data
+    const factor = sort.dir === 'asc' ? 1 : -1
+    return [...data].sort((a, b) => {
+      if (col.sortVal) return (col.sortVal(a) - col.sortVal(b)) * factor
+      return col.get(a).localeCompare(col.get(b), 'es', { numeric: true }) * factor
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseResults, colFilters, sort])
+
+  const columnasFiltradas = Object.keys(colFilters).length
+  const opcionesColumna = (key: string) => {
+    const col = COLUMNAS.find(c => c.key === key)
+    if (!col) return []
+    const vals = new Set(filtrarPorColumnas(baseResults, key).map(col.get))
+    return [...vals].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
+  }
+  const aplicarFiltroColumna = (key: string, sel: Set<string> | undefined) =>
+    setColFilters(prev => {
+      const next = { ...prev }
+      if (sel) next[key] = sel; else delete next[key]
+      return next
+    })
 
   // Desglose por categoría sobre el total, no sobre los resultados filtrados:
   // sirve para saber qué hay en el sistema antes de buscar nada.
@@ -247,9 +392,31 @@ export function BuscarPage() {
       {/* Results */}
       {searched && (
         <div>
-          <p className="text-xs text-gray-500 mb-3">
-            {results.length === 0 ? 'Sin resultados' : `${results.length} expediente${results.length !== 1 ? 's' : ''} encontrado${results.length !== 1 ? 's' : ''}`}
+          <p className="text-xs text-gray-500 mb-3 flex items-center gap-3 flex-wrap">
+            <span>
+              {results.length === 0 ? 'Sin resultados' : `${results.length} expediente${results.length !== 1 ? 's' : ''} encontrado${results.length !== 1 ? 's' : ''}`}
+              {columnasFiltradas > 0 && baseResults.length !== results.length && ` (de ${baseResults.length})`}
+            </span>
+            {(columnasFiltradas > 0 || sort) && (
+              <button onClick={() => { setColFilters({}); setSort(null) }}
+                className="text-dom-navy font-semibold hover:underline">
+                Quitar filtros y orden de columnas
+              </button>
+            )}
           </p>
+
+          {menu && (
+            <ColumnFilterMenu
+              key={menu.key}
+              options={opcionesColumna(menu.key)}
+              selected={colFilters[menu.key]}
+              sortDir={sort?.key === menu.key ? sort.dir : null}
+              anchor={menu.anchor}
+              onApply={sel => aplicarFiltroColumna(menu.key, sel)}
+              onSort={dir => setSort(dir ? { key: menu.key, dir } : null)}
+              onClose={() => setMenu(null)}
+            />
+          )}
 
           {results.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
@@ -264,11 +431,24 @@ export function BuscarPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr>
-                    {['FECHA','N°','PROPIETARIO','TIPO DE INGRESO','TIPO DE OBRA','ROL','PROFESIONAL','SUP','CAJA','TOTAL $','DIRECCIÓN','ESTADO'].map(col => (
-                      <th key={col} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
-                        {col}
-                      </th>
-                    ))}
+                    {COLUMNAS.map(col => {
+                      const activo = !!colFilters[col.key]
+                      const orden = sort?.key === col.key ? sort.dir : null
+                      return (
+                        <th key={col.key} className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 whitespace-nowrap">
+                          <button
+                            onClick={e => setMenu({ key: col.key, anchor: e.currentTarget.getBoundingClientRect() })}
+                            className="flex items-center gap-1 font-bold hover:text-dom-navy"
+                            title="Filtrar / ordenar"
+                          >
+                            {col.label}
+                            {orden === 'asc' && <ChevronUp size={12} />}
+                            {orden === 'desc' && <ChevronDown size={12} />}
+                            <Filter size={12} className={activo ? 'fill-dom-navy text-dom-navy' : 'opacity-50'} />
+                          </button>
+                        </th>
+                      )
+                    })}
                     <th className="bg-yellow-300 text-gray-900 font-bold px-2 py-2 text-left border border-yellow-400 sticky right-0 z-10"></th>
                   </tr>
                 </thead>
