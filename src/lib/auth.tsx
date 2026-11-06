@@ -3,7 +3,7 @@ import { PublicClientApplication, AccountInfo, AuthenticationResult } from '@azu
 import { MsalProvider, useMsal } from '@azure/msal-react'
 import { msalConfig, loginRequest } from './msalConfig'
 import { AuthUser, Perfil } from '../types'
-import { db } from './data'
+import { db, refreshUsuarios } from './data'
 
 export const msalInstance = new PublicClientApplication(msalConfig)
 // Inicializar MSAL antes de cualquier uso (requerido en v3+)
@@ -56,8 +56,19 @@ function AuthInner({ children }: { children: ReactNode }) {
 
   const resolveUser = async (account: AccountInfo) => {
     const email = account.username.toLowerCase()
-    const usuarios = db.getUsuarios()
-    const found    = usuarios.find(u => u.email.toLowerCase() === email && u.activo)
+    const buscar = () => db.getUsuarios().find(u => u.email.toLowerCase() === email && u.activo)
+    let found = buscar()
+
+    // La copia local puede estar desactualizada (usuarios agregados en SharePoint
+    // o desde otro computador): se consulta SharePoint antes de rechazar la cuenta.
+    if (!found) {
+      try {
+        await refreshUsuarios()
+        found = buscar()
+      } catch (e) {
+        console.warn('No se pudo actualizar la lista de usuarios:', e)
+      }
+    }
 
     if (found) {
       setUser({

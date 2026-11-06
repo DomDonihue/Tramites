@@ -6,7 +6,18 @@ import {
   spCreateUsuario, spUpdateUsuario, spDeleteUsuario,
   spUpsertSolicitante,
   spLoadAll,
+  spGetUsuarios,
 } from './sharepoint'
+
+// Trae la lista de usuarios desde SharePoint y reemplaza la copia local.
+// Se usa al iniciar sesión, antes de decidir si una cuenta tiene acceso.
+export async function refreshUsuarios(): Promise<void> {
+  const usuarios = await spGetUsuarios()
+  if (usuarios.length > 0) {
+    usuariosStore = usuarios
+    lsSave(LS_KEYS.usuarios, usuariosStore)
+  }
+}
 
 // Envío masivo de certificados locales a SharePoint
 export async function sincronizarCertificadosToSP(

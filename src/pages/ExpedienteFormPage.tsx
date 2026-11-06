@@ -38,6 +38,17 @@ const EMPTY: Omit<Expediente, 'id' | 'created_at' | 'updated_at' | 'documentos'>
   fuente:              'manual',
 }
 
+// Debe vivir fuera de ExpedienteFormPage: si se define adentro, React lo trata como
+// un componente nuevo en cada render y los campos pierden el foco al escribir.
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 export function ExpedienteFormPage() {
   const { id }     = useParams<{ id?: string }>()
   const isEdit     = !!id
@@ -168,13 +179,6 @@ export function ExpedienteFormPage() {
 
   const tipos = TIPOS_POR_CATEGORIA[form.categoria as Categoria] || []
   const esDJ = form.categoria === 'DECLARACION_JURADA'
-
-  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label}</label>
-      {children}
-    </div>
-  )
 
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-dom-navy/30 focus:border-dom-navy"
 
